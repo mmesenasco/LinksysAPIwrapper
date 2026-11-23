@@ -126,11 +126,21 @@ async def poll(client: JNAPClient) -> State:
             model = dev.get("model") or {}
             unit = dev.get("unit") or {}
             mac = (conn.get("macAddress") or "").upper()
-            nd = netmap.get(mac, {})
-            band = conn.get("band") or nd.get("band") or ""
-            signal = conn.get("signalDecibels", nd.get("signalDecibels"))
-            rate = conn.get("negotiatedMbps", nd.get("negotiatedMbps"))
-            is_wireless = bool(band or signal is not None or nd.get("isWireless"))
+            nd = netmap.get(mac)
+            # GetNetworkConnections nests wireless info under "wireless";
+            # its absence (for an entry that exists) means a wired client.
+            wl = (nd or {}).get("wireless") or {}
+            is_wireless = bool(wl)
+            band = wl.get("band") or ""
+            signal = wl.get("signalDecibels")   # SNR-like, higher is better
+            guest = bool(wl.get("isGuest")) if is_wireless else False
+            rate = (nd or {}).get("negotiatedMbps", conn.get("negotiatedMbps"))
+            if is_wireless:
+                connection = "Wireless"
+            elif nd is not None:
+                connection = "Wired"
+            else:
+                connection = ""   # online but unknown -> show "—", never guess
             parent = conn.get("parentDeviceID")
             node_name = id_to_name.get(parent, "") if parent else ""
             st.clients.append({
@@ -139,15 +149,16 @@ async def poll(client: JNAPClient) -> State:
                 "ip": conn.get("ipAddress", ""),
                 "ipv6": conn.get("ipv6Address", ""),
                 "node": node_name,
-                "type": props.get("userDeviceType", ""),
+                "type": props.get("userDeviceType") or model.get("deviceType", ""),
                 "manufacturer": props.get("userDeviceManufacturer")
                 or model.get("manufacturer", ""),
                 "model": props.get("userDeviceModelNumber")
                 or model.get("modelNumber", ""),
                 "os": props.get("userDeviceOS") or unit.get("operatingSystem", ""),
-                "connection": "Wireless" if is_wireless else ("Wired" if online else ""),
+                "connection": connection,
                 "band": band,
-                "signal_dbm": signal,
+                "signal": signal,
+                "guest": guest,
                 "rate_mbps": rate,
                 "online": online,
             })
