@@ -52,6 +52,7 @@ class State:
     clients_per_node: dict[str, int] = field(default_factory=dict)
     clients: list[dict] = field(default_factory=list)
     leases: list[dict] = field(default_factory=list)
+    security: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -63,6 +64,74 @@ class State:
 
 def _props(dev: dict) -> dict:
     return {p["name"]: p.get("value") for p in dev.get("properties", []) or []}
+
+
+async def _collect_security(client: JNAPClient) -> dict:
+    """Read-only security posture + exposure. All best-effort.
+
+    Never reads or stores secrets (e.g. guest password); only on/off state.
+    """
+    sec: dict[str, Any] = {}
+
+    fw = await client.try_call("firewall/GetFirewallSettings")
+    if fw:
+        sec["firewall_ipv4"] = fw.get("isIPv4FirewallEnabled")
+        sec["firewall_ipv6"] = fw.get("isIPv6FirewallEnabled")
+        sec["block_anonymous"] = fw.get("blockAnonymousRequests")
+
+    mg = await client.try_call("routermanagement/GetManagementSettings")
+    if mg:
+        sec["manage_remote"] = mg.get("canManageRemotely")
+        sec["manage_http"] = mg.get("canManageUsingHTTP")
+        sec["manage_https"] = mg.get("canManageUsingHTTPS")
+
+    dmz = await client.try_call("firewall/GetDMZSettings")
+    if dmz:
+        sec["dmz"] = dmz.get("isDMZEnabled")
+
+    upnp = await client.try_call("routerupnp/GetUPnPSettings")
+    if upnp:
+        sec["upnp"] = upnp.get("isUPnPEnabled")
+
+    wps = await client.try_call("wirelessap/GetWPSServerSettings")
+    if wps:
+        sec["wps"] = wps.get("enabled")
+
+    ap = await client.try_call("core/IsAdminPasswordDefault")
+    if ap:
+        sec["admin_default"] = ap.get("isAdminPasswordDefault")
+
+    gn = await client.try_call("guestnetwork/GetGuestNetworkSettings")
+    if gn:
+        sec["guest_enabled"] = gn.get("isGuestNetworkEnabled")
+        sec["guest_ssid"] = gn.get("guestSSID")   # SSID only, never the password
+
+    mf = await client.try_call("macfilter/GetMACFilterSettings")
+    if mf:
+        sec["mac_filter_mode"] = mf.get("macFilterMode")
+        sec["mac_filter_count"] = len(mf.get("macAddresses") or [])
+
+    fwu = await client.try_call("firmwareupdate/GetFirmwareUpdateSettings")
+    if fwu:
+        sec["fw_update_policy"] = fwu.get("updatePolicy")
+    fws = await client.try_call("firmwareupdate/GetFirmwareUpdateStatus")
+    if fws:
+        sec["fw_last_check"] = fws.get("lastSuccessfulCheckTime")
+
+    pf = await client.try_call("firewall/GetSinglePortForwardingRules")
+    if pf:
+        sec["port_forwards"] = [
+            {
+                "description": r.get("description", ""),
+                "external_port": r.get("externalPort"),
+                "internal_ip": r.get("internalServerIPAddress", ""),
+                "protocol": r.get("protocol", ""),
+                "enabled": r.get("isEnabled", True),
+            }
+            for r in (pf.get("rules") or [])
+        ]
+
+    return sec
 
 
 async def poll(client: JNAPClient) -> State:
@@ -228,6 +297,8 @@ async def poll(client: JNAPClient) -> State:
                 "type": (wan.get("wanConnection") or {}).get("wanType"),
                 "ip": (wan.get("wanConnection") or {}).get("ipAddress"),
             }
+
+        st.security = await _collect_security(client)
 
         st.ok = True
     except Exception as exc:  # noqa: BLE001 - surface any failure to the GUI

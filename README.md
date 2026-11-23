@@ -9,6 +9,7 @@ firmware senza cloud) e offre:
 - **healthcheck** (`/healthz`).
 - **pagina Client** (`/clients`) filtrabile e ordinabile, con API `/api/clients`.
 - **pagina Lease** (`/leases`) con la tabella DHCP/ARP (IP/MAC/host, riservato vs dinamico, scadenza, online, nodo), API `/api/leases`.
+- **pagina Sicurezza** (`/security`) con postura (firewall, gestione remota, DMZ, UPnP, WPS, password admin di default, ecc.) e porte esposte, API `/api/security`; drift di sicurezza registrati nel Log.
 - **pagina Log** (`/events`) con eventi DFS, nuovi dispositivi e nodi su/giù delle ultime 24h (persistiti su volume), API `/api/events`.
 
 Stato letto da un unico snapshot (`app/poller.py`), condiviso da GUI, API e MQTT.

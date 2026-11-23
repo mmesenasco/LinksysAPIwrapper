@@ -36,6 +36,7 @@
     <a href="/" style="color:#8b949e">Panoramica</a>
     <a href="/clients" style="color:#8b949e">Client</a>
     <a href="/leases" style="color:#8b949e">Lease</a>
+    <a href="/security" style="color:#8b949e">Sicurezza</a>
     <a href="/events" style="color:#58a6ff">Log</a>
   </nav>
   <div class="sub" id="meta">caricamento…</div>
@@ -57,6 +58,7 @@
         <option value="new_device">Nuovo dispositivo</option>
         <option value="node_down">Nodo offline</option>
         <option value="node_up">Nodo online</option>
+        <option value="security">Sicurezza</option>
       </select>
     </label>
     <input type="search" id="q" placeholder="filtra…">
@@ -77,6 +79,23 @@ const LABEL = {
   new_device: ['Nuovo disp.', 'newd'],
   node_down: ['Nodo giù', 'down'],
   node_up: ['Nodo su', 'up'],
+  sec_remote_mgmt_on: ['Sicurezza', 'down'],
+  sec_dmz_on: ['Sicurezza', 'down'],
+  sec_upnp_on: ['Sicurezza', 'down'],
+  sec_wps_on: ['Sicurezza', 'down'],
+  sec_admin_default: ['Sicurezza', 'down'],
+  sec_firewall_off: ['Sicurezza', 'down'],
+  sec_portforward_added: ['Sicurezza', 'down'],
+  sec_portforward_removed: ['Sicurezza', 'up'],
+};
+
+const SEC_MSG = {
+  sec_remote_mgmt_on: 'Gestione remota (WAN) RIATTIVATA',
+  sec_dmz_on: 'DMZ attivata',
+  sec_upnp_on: 'UPnP attivato',
+  sec_wps_on: 'WPS attivato',
+  sec_admin_default: 'Password admin tornata di default',
+  sec_firewall_off: 'Firewall disattivato',
 };
 
 function detail(e) {
@@ -87,6 +106,11 @@ function detail(e) {
     return `${e.name||'?'} · ${e.ip||'?'} · ${e.mac||''} su ${e.node||'?'}`;
   if (e.type === 'node_down' || e.type === 'node_up')
     return `${e.node}`;
+  if (e.type === 'sec_portforward_added')
+    return `Nuova porta esposta: ${e.external_port}/${e.protocol} → ${e.internal_ip}`;
+  if (e.type === 'sec_portforward_removed')
+    return `Porta chiusa: ${e.external_port}/${e.protocol} → ${e.internal_ip}`;
+  if (e.type in SEC_MSG) return SEC_MSG[e.type];
   return JSON.stringify(e);
 }
 
@@ -98,7 +122,9 @@ function fmtTime(iso) {
 function render() {
   const type = document.getElementById('type').value;
   const q = document.getElementById('q').value.toLowerCase().trim();
-  let rows = DATA.filter(e => !type || e.type === type);
+  let rows = DATA.filter(e => !type
+    || e.type === type
+    || (type === 'security' && e.type.startsWith('sec_')));
   if (q) rows = rows.filter(e => JSON.stringify(e).toLowerCase().includes(q));
 
   const tb = document.querySelector('#t tbody'); tb.innerHTML = '';

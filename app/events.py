@@ -39,6 +39,7 @@ class EventStore:
         self.known_macs: set[str] = set()
         self.last_channels: dict[str, tuple] = {}
         self.last_nodes: dict[str, bool] = {}
+        self.last_security: dict | None = None
         self.persist = True
         self.seeded = False
         self._load()
@@ -138,6 +139,44 @@ class EventStore:
                 if prev is not None and prev != on:
                     self._add("node_up" if on else "node_down", now, node=name)
         self.last_nodes = cur_nodes
+
+        # --- security posture drift ---
+        self._security_drift(state.security or {}, now)
+
+    def _security_drift(self, sec: dict, now: float) -> None:
+        prev = self.last_security
+        if prev is not None and sec:
+            # risk transitions: a flag turning to the risky value
+            risky_on = {
+                "manage_remote": "sec_remote_mgmt_on",
+                "dmz": "sec_dmz_on",
+                "upnp": "sec_upnp_on",
+                "wps": "sec_wps_on",
+                "admin_default": "sec_admin_default",
+            }
+            for key, etype in risky_on.items():
+                if not prev.get(key) and sec.get(key):
+                    self._add(etype, now, setting=key)
+            # protections turning off
+            for key, etype in {"firewall_ipv4": "sec_firewall_off",
+                               "firewall_ipv6": "sec_firewall_off"}.items():
+                if prev.get(key) and sec.get(key) is False:
+                    self._add(etype, now, setting=key)
+            # port-forward rules added/removed
+            def pf_set(s):
+                return {
+                    (r.get("external_port"), r.get("protocol"), r.get("internal_ip"))
+                    for r in (s.get("port_forwards") or [])
+                }
+            before, after = pf_set(prev), pf_set(sec)
+            for r in after - before:
+                self._add("sec_portforward_added", now,
+                          external_port=r[0], protocol=r[1], internal_ip=r[2])
+            for r in before - after:
+                self._add("sec_portforward_removed", now,
+                          external_port=r[0], protocol=r[1], internal_ip=r[2])
+        if sec:
+            self.last_security = sec
 
     # ----- query ---------------------------------------------------------
     def recent(self, hours: int = VIEW_DEFAULT_H) -> list[dict]:
