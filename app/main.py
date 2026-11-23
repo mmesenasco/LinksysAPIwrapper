@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from . import control
+from .events import EventStore
 from .jnap import JNAPClient, JNAPError
 from .mqtt_pub import MQTTPublisher
 from .poller import State, poll
@@ -32,15 +33,22 @@ MQTT_USER = os.getenv("MQTT_USERNAME")
 MQTT_PASS = os.getenv("MQTT_PASSWORD")
 ALLOW_WRITES = os.getenv("ALLOW_WRITES", "false").lower() in ("1", "true", "yes")
 
+DATA_DIR = os.getenv("DATA_DIR", "/data")
+
 _state = State()
 _state.error = "no poll yet"
 _client: JNAPClient | None = None   # shared master client, set in lifespan
+_events = EventStore(DATA_DIR)
 
 
 async def _loop(client: JNAPClient, pub: MQTTPublisher | None) -> None:
     global _state
     while True:
         _state = await poll(client)
+        try:
+            _events.update(_state)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[events] update failed: {exc}", flush=True)
         if pub:
             try:
                 pub.publish(_state)
@@ -78,6 +86,7 @@ app = FastAPI(title="JNAP Velop", lifespan=lifespan)
 _STATIC = Path(__file__).parent / "static"
 _INDEX = (_STATIC / "index.html").read_text()
 _CLIENTS = (_STATIC / "clients.html").read_text()
+_EVENTS = (_STATIC / "events.html").read_text()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -88,6 +97,17 @@ async def index() -> str:
 @app.get("/clients", response_class=HTMLResponse)
 async def clients_page() -> str:
     return _CLIENTS
+
+
+@app.get("/events", response_class=HTMLResponse)
+async def events_page() -> str:
+    return _EVENTS
+
+
+@app.get("/api/events")
+async def api_events(hours: int = 24) -> JSONResponse:
+    hours = max(1, min(hours, 168))
+    return JSONResponse({"hours": hours, "events": _events.recent(hours)})
 
 
 @app.get("/api/state")

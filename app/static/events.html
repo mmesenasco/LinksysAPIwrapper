@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JNAP Velop · Log</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, sans-serif;
+         background: #0e1116; color: #e6edf3; padding: 1.5rem; }
+  h1 { font-size: 1.2rem; margin: 0 0 .25rem; }
+  nav { margin: -.25rem 0 .75rem; font-size: .85rem; }
+  nav a { text-decoration: none; margin-right: 1rem; }
+  .sub { color: #8b949e; font-size: .8rem; margin-bottom: 1rem; }
+  .bar { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+  select, input[type=search] { padding: .4rem .6rem; background: #161b22;
+    border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; }
+  .count { color: #8b949e; font-size: .82rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #21262d; vertical-align: top; }
+  th { color: #adbac7; font-weight: 500; font-size: .72rem; text-transform: uppercase; }
+  td.ts { color: #8b949e; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pill { padding: .1rem .55rem; border-radius: 999px; font-size: .72rem; font-weight: 600; }
+  .dfs { background: #2a1a3a; color: #bc8cff; }
+  .chan { background: #15233a; color: #58a6ff; }
+  .newd { background: #102a1c; color: #3fb950; }
+  .down { background: #3a1518; color: #f85149; }
+  .up { background: #12301c; color: #3fb950; }
+  .empty { color: #6e7681; padding: 2rem 0; }
+</style>
+</head>
+<body>
+  <h1>JNAP Velop</h1>
+  <nav>
+    <a href="/" style="color:#8b949e">Panoramica</a>
+    <a href="/clients" style="color:#8b949e">Client</a>
+    <a href="/events" style="color:#58a6ff">Log</a>
+  </nav>
+  <div class="sub" id="meta">caricamento…</div>
+  <div class="bar">
+    <label class="count">Finestra
+      <select id="hours">
+        <option value="1">1 ora</option>
+        <option value="6">6 ore</option>
+        <option value="24" selected>24 ore</option>
+        <option value="72">3 giorni</option>
+        <option value="168">7 giorni</option>
+      </select>
+    </label>
+    <label class="count">Tipo
+      <select id="type">
+        <option value="">tutti</option>
+        <option value="dfs_change">DFS</option>
+        <option value="channel_change">Cambio canale</option>
+        <option value="new_device">Nuovo dispositivo</option>
+        <option value="node_down">Nodo offline</option>
+        <option value="node_up">Nodo online</option>
+      </select>
+    </label>
+    <input type="search" id="q" placeholder="filtra…">
+    <span class="count" id="count"></span>
+  </div>
+  <table id="t">
+    <thead><tr><th style="width:11rem">Quando</th><th style="width:9rem">Evento</th><th>Dettaglio</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div class="empty" id="empty" style="display:none">Nessun evento nella finestra selezionata.</div>
+
+<script>
+let DATA = [];
+
+const LABEL = {
+  dfs_change: ['DFS', 'dfs'],
+  channel_change: ['Canale', 'chan'],
+  new_device: ['Nuovo disp.', 'newd'],
+  node_down: ['Nodo giù', 'down'],
+  node_up: ['Nodo su', 'up'],
+};
+
+function detail(e) {
+  if (e.type === 'dfs_change' || e.type === 'channel_change')
+    return `${e.node}: canale ${e.from_channel} → ${e.to_channel} (${e.band||'?'})`
+      + (e.dfs ? ' <span class="pill dfs">DFS</span>' : '');
+  if (e.type === 'new_device')
+    return `${e.name||'?'} · ${e.ip||'?'} · ${e.mac||''} su ${e.node||'?'}`;
+  if (e.type === 'node_down' || e.type === 'node_up')
+    return `${e.node}`;
+  return JSON.stringify(e);
+}
+
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return isNaN(d) ? iso : d.toLocaleString('it-IT');
+}
+
+function render() {
+  const type = document.getElementById('type').value;
+  const q = document.getElementById('q').value.toLowerCase().trim();
+  let rows = DATA.filter(e => !type || e.type === type);
+  if (q) rows = rows.filter(e => JSON.stringify(e).toLowerCase().includes(q));
+
+  const tb = document.querySelector('#t tbody'); tb.innerHTML = '';
+  for (const e of rows) {
+    const [label, cls] = LABEL[e.type] || [e.type, 'chan'];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="ts">${fmtTime(e.time)}</td>`
+      + `<td><span class="pill ${cls}">${label}</span></td>`
+      + `<td>${detail(e)}</td>`;
+    tb.append(tr);
+  }
+  document.getElementById('count').textContent = `${rows.length} eventi`;
+  document.getElementById('empty').style.display = rows.length ? 'none' : 'block';
+}
+
+async function load() {
+  const h = document.getElementById('hours').value;
+  try {
+    const d = await (await fetch(`/api/events?hours=${h}`)).json();
+    DATA = d.events || [];
+    document.getElementById('meta').textContent = `ultime ${d.hours} ore · ${DATA.length} eventi registrati`;
+    render();
+  } catch { document.getElementById('meta').textContent = 'API irraggiungibile'; }
+}
+
+['hours'].forEach(id => document.getElementById(id).addEventListener('change', load));
+['type','q'].forEach(id => document.getElementById(id).addEventListener('input', render));
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>

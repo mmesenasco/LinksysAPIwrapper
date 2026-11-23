@@ -18,6 +18,8 @@ services:
       MQTT_PORT: "${MQTT_PORT:-1883}"
       MQTT_USERNAME: "${MQTT_USERNAME:-}"
       MQTT_PASSWORD: "${MQTT_PASSWORD:-}"
+    volumes:
+      - events:/data            # persists the event log + known devices
     secrets:
       - router_password
     deploy:
@@ -27,6 +29,9 @@ services:
       placement:
         constraints:
           - node.hostname == ${DEPLOY_NODE:-rpi1}
+
+volumes:
+  events: {}
 
 secrets:
   router_password:
