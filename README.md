@@ -32,20 +32,27 @@ uvicorn app.main:app --host 0.0.0.0 --port 8080
 # apri http://localhost:8080
 ```
 
-## Deploy su Docker Swarm
+## Immagine (GHCR)
+
+GitHub Actions (`.github/workflows/build.yml`) builda l'immagine multi-arch
+(arm64 + amd64) a ogni push su `main` e la pubblica su
+`ghcr.io/mmesenasco/linksysapiwrapper:latest`.
+
+## Deploy su Docker Swarm (Portainer, da git)
+
+1. **Secret**: Portainer → Secrets → Add secret, nome `router_password`, valore = password locale admin del router.
+2. **Rete**: assicurati che la rete overlay citata in `stack.yml` (`homelab`) esista; adatta il nome alla tua.
+3. **Registry GHCR**: se il package è privato, Portainer → Registries → aggiungi `ghcr.io` con username GitHub e un PAT `read:packages`. In alternativa rendi pubblico il package.
+4. **Stack**: Portainer → Stacks → Add stack → *Repository*; URL del repo, reference `refs/heads/main`, compose path `stack.yml`. Deploy.
+
+GUI su `http://rpi1:8091`.
+
+### Deploy manuale (CLI)
 
 ```bash
-# 1. secret con la password del router
 printf 'la-tua-password' | docker secret create router_password -
-
-# 2. build multi-arch (su un nodo arm64 basta build locale)
-docker build -t jnap-velop:latest .
-
-# 3. deploy (adatta rete overlay e host MQTT in stack.yml)
-docker stack deploy -c stack.yml velop
+docker stack deploy -c stack.yml velop   # richiede l'immagine su GHCR
 ```
-
-GUI su `http://<nodo>:8091`.
 
 ## Home Assistant
 

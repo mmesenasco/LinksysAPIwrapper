@@ -2,13 +2,14 @@ version: "3.8"
 
 services:
   jnap-velop:
-    image: jnap-velop:latest          # build & push to your registry, or build on the node
+    image: ghcr.io/mmesenasco/linksysapiwrapper:latest   # built by GitHub Actions
     networks: [homelab]
     ports:
       - "8091:8080"                    # GUI + /api/state
     environment:
       ROUTER_URL: "http://192.168.1.1"
       POLL_INTERVAL: "30"
+      ALLOW_WRITES: "false"            # set "true" to enable DHCP/reboot endpoints
       # --- Home Assistant via MQTT discovery (leave MQTT_HOST unset to disable) ---
       MQTT_HOST: "mosquitto"           # your broker service/host
       MQTT_PORT: "1883"
@@ -21,7 +22,7 @@ services:
       restart_policy:
         condition: any
       placement:
-        constraints: [node.role == manager]
+        constraints: [node.hostname == rpi1]   # pin to rpi1
 
 secrets:
   router_password:
