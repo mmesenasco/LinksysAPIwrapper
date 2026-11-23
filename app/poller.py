@@ -50,6 +50,7 @@ class State:
     backhaul: list[Backhaul] = field(default_factory=list)
     clients_total: int = 0
     clients_per_node: dict[str, int] = field(default_factory=dict)
+    clients: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -79,47 +80,83 @@ async def poll(client: JNAPClient) -> State:
             await client.call("devicelist/GetDevices3", {"sinceRevision": 0})
         ).get("devices", [])
 
+        # Pass 1: nodes, so clients can resolve their parent node name.
         id_to_name: dict[str, str] = {}
         ip_to_name: dict[str, str] = {}
-        online_clients = 0
-        per_node: dict[str, int] = {}
+        for dev in devices:
+            if dev.get("nodeType") is None:
+                continue
+            conns = dev.get("connections") or [{}]
+            ip = conns[0].get("ipAddress", "")
+            props = _props(dev)
+            name = props.get("userDeviceLocation") or dev.get("friendlyName", "?")
+            node = Node(
+                name=name,
+                device_id=dev.get("deviceID", ""),
+                model=dev.get("model", {}).get("modelNumber", "?"),
+                location=name,
+                ip=ip,
+                serial=dev.get("unit", {}).get("serialNumber", ""),
+                firmware=dev.get("unit", {}).get("firmwareVersion", ""),
+                role=dev.get("nodeType", ""),
+            )
+            st.nodes.append(node)
+            id_to_name[node.device_id] = name
+            if ip:
+                ip_to_name[ip] = name
 
+        # Optional live wireless metrics keyed by MAC (best effort).
+        netmap: dict[str, dict] = {}
+        nc = await client.try_call("networkconnections/GetNetworkConnections")
+        if nc:
+            for c in nc.get("connections", []) or []:
+                m = (c.get("macAddress") or "").upper()
+                if m:
+                    netmap[m] = c
+
+        # Pass 2: clients (everything that is not a node).
+        per_node: dict[str, int] = {}
         for dev in devices:
             if dev.get("nodeType") is not None:
-                conns = dev.get("connections") or [{}]
-                ip = conns[0].get("ipAddress", "")
-                props = _props(dev)
-                name = props.get("userDeviceLocation") or dev.get(
-                    "friendlyName", "?"
-                )
-                node = Node(
-                    name=name,
-                    device_id=dev.get("deviceID", ""),
-                    model=dev.get("model", {}).get("modelNumber", "?"),
-                    location=name,
-                    ip=ip,
-                    serial=dev.get("unit", {}).get("serialNumber", ""),
-                    firmware=dev.get("unit", {}).get("firmwareVersion", ""),
-                    role=dev.get("nodeType", ""),
-                )
-                st.nodes.append(node)
-                id_to_name[node.device_id] = name
-                if ip:
-                    ip_to_name[ip] = name
-            else:
-                conns = dev.get("connections") or []
-                if conns:  # has an active connection = online client
-                    online_clients += 1
-                    parent = conns[0].get("parentDeviceID")
-                    if parent:
-                        pname = parent  # resolved below once nodes known
-                        per_node[pname] = per_node.get(pname, 0) + 1
+                continue
+            conns = dev.get("connections") or []
+            online = bool(conns)
+            conn = conns[0] if conns else {}
+            props = _props(dev)
+            model = dev.get("model") or {}
+            unit = dev.get("unit") or {}
+            mac = (conn.get("macAddress") or "").upper()
+            nd = netmap.get(mac, {})
+            band = conn.get("band") or nd.get("band") or ""
+            signal = conn.get("signalDecibels", nd.get("signalDecibels"))
+            rate = conn.get("negotiatedMbps", nd.get("negotiatedMbps"))
+            is_wireless = bool(band or signal is not None or nd.get("isWireless"))
+            parent = conn.get("parentDeviceID")
+            node_name = id_to_name.get(parent, "") if parent else ""
+            st.clients.append({
+                "name": props.get("userDeviceName") or dev.get("friendlyName") or "?",
+                "mac": mac,
+                "ip": conn.get("ipAddress", ""),
+                "ipv6": conn.get("ipv6Address", ""),
+                "node": node_name,
+                "type": props.get("userDeviceType", ""),
+                "manufacturer": props.get("userDeviceManufacturer")
+                or model.get("manufacturer", ""),
+                "model": props.get("userDeviceModelNumber")
+                or model.get("modelNumber", ""),
+                "os": props.get("userDeviceOS") or unit.get("operatingSystem", ""),
+                "connection": "Wireless" if is_wireless else ("Wired" if online else ""),
+                "band": band,
+                "signal_dbm": signal,
+                "rate_mbps": rate,
+                "online": online,
+            })
+            if online:
+                key = node_name or "?"
+                per_node[key] = per_node.get(key, 0) + 1
 
-        st.clients_total = online_clients
-        # resolve parent IDs to node names where possible
-        st.clients_per_node = {
-            id_to_name.get(pid, pid): n for pid, n in per_node.items()
-        }
+        st.clients_total = sum(1 for c in st.clients if c["online"])
+        st.clients_per_node = per_node
 
         # Backhaul (parent + per-link radio metrics)
         bh = await client.try_call("nodes/diagnostics/GetBackhaulInfo")

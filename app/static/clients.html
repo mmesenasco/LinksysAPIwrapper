@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JNAP Velop · Client</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, sans-serif;
+         background: #0e1116; color: #e6edf3; padding: 1.5rem; }
+  h1 { font-size: 1.2rem; margin: 0 0 .25rem; }
+  nav { margin: -.25rem 0 .75rem; font-size: .85rem; }
+  nav a { text-decoration: none; margin-right: 1rem; }
+  .sub { color: #8b949e; font-size: .8rem; margin-bottom: 1rem; }
+  .bar { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+  input[type=search] { padding: .45rem .7rem; width: 280px; background: #161b22;
+    border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; }
+  label { color: #8b949e; font-size: .82rem; display: flex; gap: .35rem; align-items: center; }
+  .count { color: #8b949e; font-size: .82rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid #21262d; white-space: nowrap; }
+  th { color: #adbac7; font-weight: 500; font-size: .72rem; text-transform: uppercase;
+       cursor: pointer; user-select: none; position: sticky; top: 0; background: #0e1116; }
+  th:hover { color: #fff; }
+  th.sorted::after { content: " ▲"; color: #58a6ff; }
+  th.sorted.desc::after { content: " ▼"; }
+  td.muted { color: #6e7681; }
+  tr:hover td { background: #11161d; }
+  .pill { padding: .1rem .5rem; border-radius: 999px; font-size: .72rem; font-weight: 600; }
+  .ok { background: #12301c; color: #3fb950; }
+  .warn { background: #3a2a10; color: #d29922; }
+  .bad { background: #3a1518; color: #f85149; }
+  .off { background: #21262d; color: #6e7681; }
+  .wired { background: #15233a; color: #58a6ff; }
+</style>
+</head>
+<body>
+  <h1>JNAP Velop</h1>
+  <nav>
+    <a href="/" style="color:#8b949e">Panoramica</a>
+    <a href="/clients" style="color:#58a6ff">Client</a>
+  </nav>
+  <div class="sub" id="meta">caricamento…</div>
+  <div class="bar">
+    <input type="search" id="q" placeholder="filtra (nome, IP, MAC, nodo, produttore…)">
+    <label><input type="checkbox" id="onlyonline" checked> solo online</label>
+    <span class="count" id="count"></span>
+  </div>
+  <table id="t">
+    <thead><tr>
+      <th data-k="name">Nome</th>
+      <th data-k="ip">IP</th>
+      <th data-k="mac">MAC</th>
+      <th data-k="node">Nodo</th>
+      <th data-k="connection">Conness.</th>
+      <th data-k="band">Banda</th>
+      <th data-k="signal_dbm">RSSI</th>
+      <th data-k="rate_mbps">Rate</th>
+      <th data-k="type">Tipo</th>
+      <th data-k="manufacturer">Produttore</th>
+      <th data-k="model">Modello</th>
+      <th data-k="os">OS</th>
+      <th data-k="online">Stato</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+
+<script>
+let DATA = [];
+let sortKey = 'name', sortDir = 1;
+
+const rssiPill = r => r == null ? '<span class="muted">—</span>'
+  : `<span class="pill ${r>=-70?'ok':r>=-80?'warn':'bad'}">${r} dBm</span>`;
+const connPill = c => c === 'Wireless' ? '<span class="pill wired">Wi-Fi</span>'
+  : c === 'Wired' ? '<span class="pill ok">cavo</span>' : '<span class="muted">—</span>';
+const cmp = (a, b) => {
+  const x = a[sortKey], y = b[sortKey];
+  if (x == null && y == null) return 0;
+  if (x == null) return 1; if (y == null) return -1;
+  if (typeof x === 'number' && typeof y === 'number') return (x - y) * sortDir;
+  return String(x).localeCompare(String(y), 'it', {numeric:true}) * sortDir;
+};
+
+function render() {
+  const q = document.getElementById('q').value.toLowerCase().trim();
+  const onlyOnline = document.getElementById('onlyonline').checked;
+  let rows = DATA.filter(c => !onlyOnline || c.online);
+  if (q) rows = rows.filter(c => Object.values(c).some(v => String(v ?? '').toLowerCase().includes(q)));
+  rows.sort(cmp);
+
+  const tb = document.querySelector('#t tbody'); tb.innerHTML = '';
+  for (const c of rows) {
+    const tr = document.createElement('tr');
+    const online = c.online ? '<span class="pill ok">online</span>' : '<span class="pill off">offline</span>';
+    tr.innerHTML =
+      `<td>${c.name||'—'}</td>`
+      + `<td class="muted">${c.ip||'—'}</td>`
+      + `<td class="muted">${c.mac||'—'}</td>`
+      + `<td>${c.node||'—'}</td>`
+      + `<td>${connPill(c.connection)}</td>`
+      + `<td>${c.band||'—'}</td>`
+      + `<td>${rssiPill(c.signal_dbm)}</td>`
+      + `<td>${c.rate_mbps!=null?Math.round(c.rate_mbps)+' Mbps':'—'}</td>`
+      + `<td class="muted">${c.type||'—'}</td>`
+      + `<td>${c.manufacturer||'—'}</td>`
+      + `<td class="muted">${c.model||'—'}</td>`
+      + `<td class="muted">${c.os||'—'}</td>`
+      + `<td>${online}</td>`;
+    tb.append(tr);
+  }
+  document.getElementById('count').textContent = `${rows.length} client`;
+  document.querySelectorAll('th').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.k === sortKey);
+    th.classList.toggle('desc', th.dataset.k === sortKey && sortDir === -1);
+  });
+}
+
+document.querySelectorAll('th').forEach(th => th.addEventListener('click', () => {
+  const k = th.dataset.k;
+  if (k === sortKey) sortDir = -sortDir; else { sortKey = k; sortDir = 1; }
+  render();
+}));
+document.getElementById('q').addEventListener('input', render);
+document.getElementById('onlyonline').addEventListener('change', render);
+
+async function load() {
+  try {
+    const d = await (await fetch('/api/clients')).json();
+    DATA = d.clients || [];
+    document.getElementById('meta').textContent = `${DATA.length} dispositivi noti · aggiornato ${d.updated_iso}`;
+    render();
+  } catch { document.getElementById('meta').textContent = 'API irraggiungibile'; }
+}
+load();
+setInterval(load, 10000);
+</script>
+</body>
+</html>
