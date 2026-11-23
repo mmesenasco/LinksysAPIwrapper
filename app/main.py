@@ -87,6 +87,7 @@ _STATIC = Path(__file__).parent / "static"
 _INDEX = (_STATIC / "index.html").read_text()
 _CLIENTS = (_STATIC / "clients.html").read_text()
 _EVENTS = (_STATIC / "events.html").read_text()
+_LEASES = (_STATIC / "leases.html").read_text()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -102,6 +103,19 @@ async def clients_page() -> str:
 @app.get("/events", response_class=HTMLResponse)
 async def events_page() -> str:
     return _EVENTS
+
+
+@app.get("/leases", response_class=HTMLResponse)
+async def leases_page() -> str:
+    return _LEASES
+
+
+@app.get("/api/leases")
+async def api_leases() -> JSONResponse:
+    return JSONResponse({
+        "updated_iso": _state.to_dict()["updated_iso"],
+        "leases": _state.leases,
+    })
 
 
 @app.get("/api/events")
