@@ -6,10 +6,12 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel
 
-from .jnap import JNAPClient
+from . import control
+from .jnap import JNAPClient, JNAPError
 from .mqtt_pub import MQTTPublisher
 from .poller import State, poll
 
@@ -28,9 +30,11 @@ MQTT_HOST = os.getenv("MQTT_HOST")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_USER = os.getenv("MQTT_USERNAME")
 MQTT_PASS = os.getenv("MQTT_PASSWORD")
+ALLOW_WRITES = os.getenv("ALLOW_WRITES", "false").lower() in ("1", "true", "yes")
 
 _state = State()
 _state.error = "no poll yet"
+_client: JNAPClient | None = None   # shared master client, set in lifespan
 
 
 async def _loop(client: JNAPClient, pub: MQTTPublisher | None) -> None:
@@ -47,7 +51,9 @@ async def _loop(client: JNAPClient, pub: MQTTPublisher | None) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _client
     client = JNAPClient(ROUTER_URL, _password())
+    _client = client
     pub = None
     if MQTT_HOST:
         try:
@@ -86,3 +92,71 @@ async def api_state() -> JSONResponse:
 async def healthz() -> JSONResponse:
     code = 200 if _state.ok else 503
     return JSONResponse({"ok": _state.ok, "error": _state.error}, status_code=code)
+
+
+# --------------------------------------------------------------------------
+# Phase 2: write actions (DHCP reservations, node reboot).
+# Disabled unless ALLOW_WRITES is set. Mutating calls run read-modify-write.
+# --------------------------------------------------------------------------
+class Reservation(BaseModel):
+    mac: str
+    ip: str
+    description: str
+
+
+def _require_writes() -> JNAPClient:
+    if not ALLOW_WRITES:
+        raise HTTPException(403, "scritture disabilitate (ALLOW_WRITES non attivo)")
+    if _client is None:
+        raise HTTPException(503, "client non pronto")
+    return _client
+
+
+@app.get("/api/config")
+async def api_config() -> dict:
+    return {"allow_writes": ALLOW_WRITES, "router_url": ROUTER_URL}
+
+
+@app.get("/api/reservations")
+async def get_reservations() -> dict:
+    if _client is None:
+        raise HTTPException(503, "client non pronto")
+    try:
+        return {"reservations": await control.list_reservations(_client)}
+    except JNAPError as e:
+        raise HTTPException(502, str(e))
+
+
+@app.post("/api/reservations")
+async def post_reservation(r: Reservation) -> dict:
+    client = _require_writes()
+    try:
+        return await control.add_reservation(client, r.mac, r.ip, r.description)
+    except control.ValidationError as e:
+        raise HTTPException(400, str(e))
+    except JNAPError as e:
+        raise HTTPException(502, str(e))
+
+
+@app.delete("/api/reservations/{mac}")
+async def del_reservation(mac: str) -> dict:
+    client = _require_writes()
+    try:
+        return await control.delete_reservation(client, mac)
+    except control.ValidationError as e:
+        raise HTTPException(400, str(e))
+    except JNAPError as e:
+        raise HTTPException(502, str(e))
+
+
+@app.post("/api/nodes/{ip}/reboot")
+async def reboot_node(ip: str) -> dict:
+    _require_writes()
+    try:
+        control._check_ip(ip)
+        await control.reboot_target(f"http://{ip}", _password())
+        return {"ok": True, "rebooting": ip}
+    except control.ValidationError as e:
+        raise HTTPException(400, str(e))
+    except JNAPError as e:
+        raise HTTPException(502, str(e))

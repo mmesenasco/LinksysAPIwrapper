@@ -40,10 +40,26 @@
   </tr></thead><tbody></tbody></table>
   <h2>Nodi</h2>
   <table id="nodes"><thead><tr>
-    <th>Posizione</th><th>Modello</th><th>IP</th><th>Firmware</th><th>Stato</th>
+    <th>Posizione</th><th>Modello</th><th>IP</th><th>Firmware</th><th>Stato</th><th></th>
   </tr></thead><tbody></tbody></table>
 
+  <section id="mgmt" style="display:none">
+    <h2>Prenotazioni DHCP</h2>
+    <table id="res"><thead><tr><th>MAC</th><th>IP</th><th>Descrizione</th><th></th></tr></thead><tbody></tbody></table>
+    <form id="resform" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.5rem">
+      <input name="mac" placeholder="AA:BB:CC:DD:EE:FF" required
+             style="padding:.4rem;background:#0e1116;border:1px solid #30363d;border-radius:6px;color:#e6edf3">
+      <input name="ip" placeholder="192.168.1.xxx" required
+             style="padding:.4rem;background:#0e1116;border:1px solid #30363d;border-radius:6px;color:#e6edf3">
+      <input name="description" placeholder="descrizione" required
+             style="padding:.4rem;background:#0e1116;border:1px solid #30363d;border-radius:6px;color:#e6edf3">
+      <button style="padding:.4rem .8rem;background:#238636;border:0;border-radius:6px;color:#fff;cursor:pointer">Aggiungi</button>
+    </form>
+    <div id="msg" style="margin-top:.5rem;font-size:.82rem"></div>
+  </section>
+
 <script>
+let WRITES = false;
 const rssiClass = r => r == null ? 'muted' : r >= -70 ? 'ok' : r >= -80 ? 'warn' : 'bad';
 const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
 
@@ -82,13 +98,66 @@ async function tick() {
   (s.nodes||[]).forEach(n => {
     const tr = el('tr');
     const st = n.online ? '<span class="pill ok">online</span>' : '<span class="pill bad">offline</span>';
+    const btn = WRITES
+      ? `<button data-ip="${n.ip}" class="reboot" style="padding:.2rem .6rem;background:#30363d;border:0;border-radius:6px;color:#e6edf3;cursor:pointer">riavvia</button>`
+      : '';
     tr.innerHTML = `<td>${n.location}</td><td>${n.model}</td><td class="muted">${n.ip}</td>`
-      + `<td class="muted">${n.firmware}</td><td>${st}</td>`;
+      + `<td class="muted">${n.firmware}</td><td>${st}</td><td>${btn}</td>`;
     nt.append(tr);
   });
 }
-tick();
-setInterval(tick, 5000);
+const msg = (t, ok) => { const m = document.getElementById('msg'); m.textContent = t; m.style.color = ok ? '#3fb950' : '#f85149'; };
+
+async function loadReservations() {
+  const tb = document.querySelector('#res tbody'); tb.innerHTML = '';
+  let data;
+  try { data = await (await fetch('/api/reservations')).json(); }
+  catch { return; }
+  (data.reservations || []).forEach(r => {
+    const tr = el('tr');
+    const del = `<button data-mac="${r.macAddress}" class="delres" style="padding:.2rem .6rem;background:#3a1518;border:0;border-radius:6px;color:#f85149;cursor:pointer">rimuovi</button>`;
+    tr.innerHTML = `<td class="muted">${r.macAddress}</td><td>${r.ipAddress}</td><td>${r.description||''}</td><td>${del}</td>`;
+    tb.append(tr);
+  });
+}
+
+// Event delegation for reboot + delete + add
+document.addEventListener('click', async (e) => {
+  const rb = e.target.closest('.reboot');
+  if (rb) {
+    if (!confirm(`Riavviare il nodo ${rb.dataset.ip}?`)) return;
+    const r = await fetch(`/api/nodes/${rb.dataset.ip}/reboot`, {method:'POST'});
+    msg(r.ok ? `Riavvio inviato a ${rb.dataset.ip}` : `Errore: ${(await r.json()).detail}`, r.ok);
+    return;
+  }
+  const dl = e.target.closest('.delres');
+  if (dl) {
+    if (!confirm(`Rimuovere la prenotazione ${dl.dataset.mac}?`)) return;
+    const r = await fetch(`/api/reservations/${dl.dataset.mac}`, {method:'DELETE'});
+    msg(r.ok ? 'Prenotazione rimossa' : `Errore: ${(await r.json()).detail}`, r.ok);
+    loadReservations();
+  }
+});
+
+document.getElementById('resform').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const body = {mac: f.mac.value, ip: f.ip.value, description: f.description.value};
+  const r = await fetch('/api/reservations', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  if (r.ok) { msg('Prenotazione salvata', true); f.reset(); loadReservations(); }
+  else { msg(`Errore: ${(await r.json()).detail}`, false); }
+});
+
+async function init() {
+  try {
+    const cfg = await (await fetch('/api/config')).json();
+    WRITES = !!cfg.allow_writes;
+  } catch {}
+  if (WRITES) { document.getElementById('mgmt').style.display = 'block'; loadReservations(); }
+  tick();
+  setInterval(tick, 5000);
+}
+init();
 </script>
 </body>
 </html>

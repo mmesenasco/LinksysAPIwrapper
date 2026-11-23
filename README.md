@@ -20,6 +20,7 @@ Stato letto da un unico snapshot (`app/poller.py`), condiviso da GUI, API e MQTT
 | `MQTT_HOST` | — | se assente, MQTT disabilitato |
 | `MQTT_PORT` | `1883` | |
 | `MQTT_USERNAME` / `MQTT_PASSWORD` | — | opzionali |
+| `ALLOW_WRITES` | `false` | abilita gli endpoint di scrittura (DHCP, reboot) |
 
 ## Prova locale
 
@@ -58,5 +59,24 @@ RSSI di backhaul, canale, flag DFS, client totali.
   `nodes/diagnostics/GetBackhaulInfo`. `router/GetWANStatus` è best-effort.
 - DFS: un backhaul su canale 52–64 o 100–144 può cadere su rilevamento radar;
   il flag `is_dfs` lo evidenzia.
-- Le azioni di scrittura (prenotazioni DHCP, reboot nodo) sono volutamente
-  **fuori** da questa v1 read-only. Fase 2.
+## Scritture (fase 2)
+
+Con `ALLOW_WRITES=true` si attivano gli endpoint di scrittura e la sezione di
+gestione nella GUI. Con il flag a `false` (default) il servizio è sola lettura e
+questi endpoint rispondono `403`.
+
+| Metodo | Endpoint | Azione |
+|---|---|---|
+| `GET` | `/api/reservations` | elenca le prenotazioni DHCP (anche a writes off) |
+| `POST` | `/api/reservations` | aggiunge/aggiorna `{mac, ip, description}` |
+| `DELETE` | `/api/reservations/{mac}` | rimuove una prenotazione |
+| `POST` | `/api/nodes/{ip}/reboot` | riavvia un nodo per IP (master o figlio) |
+
+Le prenotazioni usano un **read-modify-write stretto**: si legge l'intero oggetto
+`GetLANSettings`, si modifica solo l'array `reservations`, e si rimanda indietro
+l'oggetto completo con `SetLANSettings`. Range DHCP, gateway e altre prenotazioni
+restano intatti. MAC e IP sono validati e un IP già prenotato per un altro MAC
+viene rifiutato prima di scrivere.
+
+Il reboot di un nodo figlio sfrutta il fatto che ogni Velop parla JNAP sul proprio
+IP e accetta la stessa password admin del master.
