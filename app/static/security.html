@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JNAP Velop · Sicurezza</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, sans-serif;
+         background: #0e1116; color: #e6edf3; padding: 1.5rem; }
+  h1 { font-size: 1.2rem; margin: 0 0 .25rem; }
+  h2 { font-size: .9rem; color: #adbac7; margin: 1.25rem 0 .5rem; }
+  nav { margin: -.25rem 0 .75rem; font-size: .85rem; }
+  nav a { text-decoration: none; margin-right: 1rem; }
+  .sub { color: #8b949e; font-size: .8rem; margin-bottom: 1rem; }
+  .grid { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: .8rem .9rem;
+          display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+  .card .k { color: #8b949e; font-size: .8rem; }
+  .pill { padding: .15rem .6rem; border-radius: 999px; font-size: .74rem; font-weight: 600; white-space: nowrap; }
+  .ok { background: #12301c; color: #3fb950; }
+  .bad { background: #3a1518; color: #f85149; }
+  .warn { background: #3a2a10; color: #d29922; }
+  .muted { background: #21262d; color: #6e7681; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #21262d; white-space: nowrap; }
+  th { color: #8b949e; font-weight: 500; font-size: .72rem; text-transform: uppercase; }
+  td.muted2 { color: #6e7681; }
+  .empty { color: #6e7681; padding: 1rem 0; }
+</style>
+</head>
+<body>
+  <h1>JNAP Velop</h1>
+  <nav>
+    <a href="/" style="color:#8b949e">Panoramica</a>
+    <a href="/clients" style="color:#8b949e">Client</a>
+    <a href="/leases" style="color:#8b949e">Lease</a>
+    <a href="/security" style="color:#58a6ff">Sicurezza</a>
+    <a href="/events" style="color:#8b949e">Log</a>
+  </nav>
+  <div class="sub" id="meta">caricamento…</div>
+
+  <h2>Postura</h2>
+  <div class="grid" id="posture"></div>
+
+  <h2>Port forwarding (porte esposte verso Internet)</h2>
+  <table id="pf"><thead><tr>
+    <th>Descrizione</th><th>Porta esterna</th><th>Protocollo</th><th>IP interno</th><th>Stato</th>
+  </tr></thead><tbody></tbody></table>
+  <div class="empty" id="pfempty" style="display:none">Nessuna porta inoltrata. ✔</div>
+
+<script>
+// each: [label, value, risk]  risk: true=bad-when-on style handled per item
+function pill(text, cls) { return `<span class="pill ${cls}">${text}</span>`; }
+
+function render(sec) {
+  const P = document.getElementById('posture'); P.innerHTML = '';
+  const add = (k, html) => {
+    const c = document.createElement('div'); c.className = 'card';
+    c.innerHTML = `<span class="k">${k}</span>${html}`; P.append(c);
+  };
+  const onoff = (v, goodWhenOn) => v == null ? pill('n/d','muted')
+    : v ? pill('ON', goodWhenOn ? 'ok' : 'bad') : pill('OFF', goodWhenOn ? 'bad' : 'ok');
+
+  add('Gestione remota (WAN)', onoff(sec.manage_remote, false));
+  add('Firewall IPv4', onoff(sec.firewall_ipv4, true));
+  add('Firewall IPv6', onoff(sec.firewall_ipv6, true));
+  add('Block anonymous requests', onoff(sec.block_anonymous, true));
+  add('DMZ', onoff(sec.dmz, false));
+  add('UPnP', onoff(sec.upnp, false));
+  add('WPS', onoff(sec.wps, false));
+  add('Password admin di default', sec.admin_default == null ? pill('n/d','muted')
+      : sec.admin_default ? pill('SÌ — cambiala','bad') : pill('No','ok'));
+  add('Gestione via HTTP', onoff(sec.manage_http, false));
+  add('Gestione via HTTPS', onoff(sec.manage_https, true));
+  add('Rete guest', sec.guest_enabled == null ? pill('n/d','muted')
+      : pill(sec.guest_enabled ? ('ON · '+(sec.guest_ssid||'')) : 'OFF', 'muted'));
+  if (sec.mac_filter_mode !== undefined)
+    add('Filtro MAC', pill((sec.mac_filter_mode||'?') + (sec.mac_filter_count?` · ${sec.mac_filter_count}`:''),
+        sec.mac_filter_mode === 'Disabled' ? 'muted' : 'ok'));
+  if (sec.fw_update_policy !== undefined)
+    add('Aggiornamenti firmware', pill(sec.fw_update_policy || '?',
+        sec.fw_update_policy === 'Off' ? 'warn' : 'ok'));
+
+  const tb = document.querySelector('#pf tbody'); tb.innerHTML = '';
+  const pf = sec.port_forwards || [];
+  for (const r of pf) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.description||'—'}</td><td>${r.external_port??'—'}</td>`
+      + `<td>${r.protocol||'—'}</td><td class="muted2">${r.internal_ip||'—'}</td>`
+      + `<td>${r.enabled ? pill('attiva','warn') : pill('disattiva','muted')}</td>`;
+    tb.append(tr);
+  }
+  document.getElementById('pfempty').style.display = pf.length ? 'none' : 'block';
+  document.getElementById('pf').style.display = pf.length ? '' : 'none';
+}
+
+async function load() {
+  try {
+    const d = await (await fetch('/api/security')).json();
+    document.getElementById('meta').textContent = `aggiornato ${d.updated_iso}`;
+    render(d.security || {});
+  } catch { document.getElementById('meta').textContent = 'API irraggiungibile'; }
+}
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>

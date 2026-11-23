@@ -88,6 +88,7 @@ _INDEX = (_STATIC / "index.html").read_text()
 _CLIENTS = (_STATIC / "clients.html").read_text()
 _EVENTS = (_STATIC / "events.html").read_text()
 _LEASES = (_STATIC / "leases.html").read_text()
+_SECURITY = (_STATIC / "security.html").read_text()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -115,6 +116,19 @@ async def api_leases() -> JSONResponse:
     return JSONResponse({
         "updated_iso": _state.to_dict()["updated_iso"],
         "leases": _state.leases,
+    })
+
+
+@app.get("/security", response_class=HTMLResponse)
+async def security_page() -> str:
+    return _SECURITY
+
+
+@app.get("/api/security")
+async def api_security() -> JSONResponse:
+    return JSONResponse({
+        "updated_iso": _state.to_dict()["updated_iso"],
+        "security": _state.security,
     })
 
 
