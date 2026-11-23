@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JNAP Velop</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, sans-serif;
+         background: #0e1116; color: #e6edf3; padding: 1.5rem; }
+  h1 { font-size: 1.2rem; margin: 0 0 .25rem; }
+  .sub { color: #8b949e; font-size: .8rem; margin-bottom: 1.25rem; }
+  .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); margin-bottom: 1.25rem; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: .9rem 1rem; }
+  .card .k { color: #8b949e; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
+  .card .v { font-size: 1.5rem; font-weight: 600; margin-top: .2rem; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: .85rem; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #21262d; }
+  th { color: #8b949e; font-weight: 500; font-size: .72rem; text-transform: uppercase; }
+  .pill { padding: .1rem .5rem; border-radius: 999px; font-size: .72rem; font-weight: 600; }
+  .ok { background: #12301c; color: #3fb950; }
+  .warn { background: #3a2a10; color: #d29922; }
+  .bad { background: #3a1518; color: #f85149; }
+  .muted { color: #6e7681; }
+  .dfs { background: #2a1a3a; color: #bc8cff; }
+  h2 { font-size: .9rem; color: #adbac7; margin: 0 0 .5rem; }
+  #err { color: #f85149; margin-bottom: 1rem; }
+</style>
+</head>
+<body>
+  <h1>JNAP Velop</h1>
+  <div class="sub" id="meta">caricamento…</div>
+  <div id="err"></div>
+  <div class="grid" id="cards"></div>
+  <h2>Backhaul</h2>
+  <table id="bh"><thead><tr>
+    <th>Nodo</th><th>Parent</th><th>Tipo</th><th>Banda</th><th>Canale</th>
+    <th>RSSI</th><th>Velocità</th>
+  </tr></thead><tbody></tbody></table>
+  <h2>Nodi</h2>
+  <table id="nodes"><thead><tr>
+    <th>Posizione</th><th>Modello</th><th>IP</th><th>Firmware</th><th>Stato</th>
+  </tr></thead><tbody></tbody></table>
+
+<script>
+const rssiClass = r => r == null ? 'muted' : r >= -70 ? 'ok' : r >= -80 ? 'warn' : 'bad';
+const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
+
+async function tick() {
+  let s;
+  try { s = await (await fetch('/api/state')).json(); }
+  catch (e) { document.getElementById('err').textContent = 'API irraggiungibile'; return; }
+
+  document.getElementById('err').textContent = s.error && !s.ok ? ('Errore: ' + s.error) : '';
+  document.getElementById('meta').textContent =
+    `aggiornato ${s.updated_iso} · poll ${s.poll_seconds}s · router ${s.router.model||'?'} fw ${s.router.firmware||'?'}`;
+
+  const cards = document.getElementById('cards'); cards.innerHTML = '';
+  const add = (k, v) => { const c = el('div','card'); c.append(el('div','k',k), el('div','v',v)); cards.append(c); };
+  add('Stato', s.ok ? '<span class="pill ok">OK</span>' : '<span class="pill bad">KO</span>');
+  add('Client online', s.clients_total);
+  add('Nodi', s.nodes.length);
+  const dfs = (s.backhaul||[]).filter(b => b.is_dfs).length;
+  add('Link su DFS', dfs ? `<span class="pill dfs">${dfs}</span>` : '0');
+  if (s.wan && s.wan.status) add('WAN', s.wan.status);
+
+  const bh = document.querySelector('#bh tbody'); bh.innerHTML = '';
+  (s.backhaul||[]).forEach(b => {
+    const tr = el('tr');
+    const rssi = b.rssi_station == null ? '—'
+      : `<span class="pill ${rssiClass(b.rssi_station)}">${b.rssi_station} dBm</span>`;
+    const ch = b.channel == null ? '—'
+      : (b.is_dfs ? `${b.channel} <span class="pill dfs">DFS</span>` : b.channel);
+    tr.innerHTML = `<td>${b.node}</td><td class="muted">${b.parent_ip}</td>`
+      + `<td>${b.connection_type}</td><td>${b.band||'—'}</td><td>${ch}</td>`
+      + `<td>${rssi}</td><td>${b.speed_mbps!=null?b.speed_mbps.toFixed(0)+' Mbps':'—'}</td>`;
+    bh.append(tr);
+  });
+
+  const nt = document.querySelector('#nodes tbody'); nt.innerHTML = '';
+  (s.nodes||[]).forEach(n => {
+    const tr = el('tr');
+    const st = n.online ? '<span class="pill ok">online</span>' : '<span class="pill bad">offline</span>';
+    tr.innerHTML = `<td>${n.location}</td><td>${n.model}</td><td class="muted">${n.ip}</td>`
+      + `<td class="muted">${n.firmware}</td><td>${st}</td>`;
+    nt.append(tr);
+  });
+}
+tick();
+setInterval(tick, 5000);
+</script>
+</body>
+</html>
