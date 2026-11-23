@@ -8,6 +8,7 @@ firmware senza cloud) e offre:
 - **export verso Home Assistant** via MQTT discovery (i sensori compaiono da soli);
 - **healthcheck** (`/healthz`).
 - **pagina Client** (`/clients`) filtrabile e ordinabile, con API `/api/clients`.
+- **pagina Log** (`/events`) con eventi DFS, nuovi dispositivi e nodi su/giù delle ultime 24h (persistiti su volume), API `/api/events`.
 
 Stato letto da un unico snapshot (`app/poller.py`), condiviso da GUI, API e MQTT.
 
