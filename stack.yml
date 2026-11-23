@@ -1,20 +1,23 @@
 version: "3.8"
 
+# All settings are overridable via stack environment variables in Portainer
+# (or a .env file). Defaults in ${VAR:-default} keep a zero-config first run.
+
 services:
   jnap-velop:
-    image: ghcr.io/mmesenasco/linksysapiwrapper:latest   # built by GitHub Actions
-    networks: [homelab]
+    image: ghcr.io/mmesenasco/linksysapiwrapper:${IMAGE_TAG:-latest}
+    networks: [net]
     ports:
-      - "8091:8080"                    # GUI + /api/state
+      - "${GUI_PORT:-8091}:8080"        # GUI + /api/state
     environment:
-      ROUTER_URL: "http://192.168.1.1"
-      POLL_INTERVAL: "30"
-      ALLOW_WRITES: "false"            # set "true" to enable DHCP/reboot endpoints
-      # --- Home Assistant via MQTT discovery (leave MQTT_HOST unset to disable) ---
-      MQTT_HOST: "mosquitto"           # your broker service/host
-      MQTT_PORT: "1883"
-      # MQTT_USERNAME: "velop"
-      # MQTT_PASSWORD: "..."           # prefer a secret for this too
+      ROUTER_URL: "${ROUTER_URL:-http://192.168.1.1}"
+      POLL_INTERVAL: "${POLL_INTERVAL:-30}"
+      ALLOW_WRITES: "${ALLOW_WRITES:-false}"   # "true" enables DHCP/reboot endpoints
+      # Home Assistant via MQTT discovery. Leave MQTT_HOST empty to disable.
+      MQTT_HOST: "${MQTT_HOST:-}"
+      MQTT_PORT: "${MQTT_PORT:-1883}"
+      MQTT_USERNAME: "${MQTT_USERNAME:-}"
+      MQTT_PASSWORD: "${MQTT_PASSWORD:-}"
     secrets:
       - router_password
     deploy:
@@ -22,12 +25,14 @@ services:
       restart_policy:
         condition: any
       placement:
-        constraints: [node.hostname == rpi1]   # pin to rpi1
+        constraints:
+          - node.hostname == ${DEPLOY_NODE:-rpi1}
 
 secrets:
   router_password:
-    external: true                     # docker secret create router_password ./pw.txt
+    external: true                      # docker secret create router_password ./pw.txt
 
 networks:
-  homelab:
-    external: true                     # your existing overlay network
+  net:
+    external: true
+    name: ${OVERLAY_NETWORK:-homelab}   # your existing overlay network

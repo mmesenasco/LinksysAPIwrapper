@@ -22,6 +22,18 @@ Stato letto da un unico snapshot (`app/poller.py`), condiviso da GUI, API e MQTT
 | `MQTT_USERNAME` / `MQTT_PASSWORD` | — | opzionali |
 | `ALLOW_WRITES` | `false` | abilita gli endpoint di scrittura (DHCP, reboot) |
 
+### Variabili di deployment (compose/Swarm)
+
+| Variabile | Default | Note |
+|---|---|---|
+| `IMAGE_TAG` | `latest` | tag immagine GHCR |
+| `GUI_PORT` | `8091` | porta pubblicata della GUI |
+| `OVERLAY_NETWORK` | `homelab` | nome della rete overlay esterna esistente |
+| `DEPLOY_NODE` | `rpi1` | hostname del nodo Swarm su cui fissare il servizio |
+
+Tutte impostabili come env dello stack in Portainer: niente da editare nel file.
+Vedi `.env.example`.
+
 ## Prova locale
 
 ```bash
@@ -41,7 +53,7 @@ GitHub Actions (`.github/workflows/build.yml`) builda l'immagine multi-arch
 ## Deploy su Docker Swarm (Portainer, da git)
 
 1. **Secret**: Portainer → Secrets → Add secret, nome `router_password`, valore = password locale admin del router.
-2. **Rete**: assicurati che la rete overlay citata in `stack.yml` (`homelab`) esista; adatta il nome alla tua.
+2. **Rete**: imposta `OVERLAY_NETWORK` al nome della tua rete overlay esterna (default `homelab`).
 3. **Registry GHCR**: se il package è privato, Portainer → Registries → aggiungi `ghcr.io` con username GitHub e un PAT `read:packages`. In alternativa rendi pubblico il package.
 4. **Stack**: Portainer → Stacks → Add stack → *Repository*; URL del repo, reference `refs/heads/main`, compose path `stack.yml`. Deploy.
 
@@ -87,3 +99,7 @@ viene rifiutato prima di scrivere.
 
 Il reboot di un nodo figlio sfrutta il fatto che ogni Velop parla JNAP sul proprio
 IP e accetta la stessa password admin del master.
+
+## Licenza
+
+[MIT](LICENSE) — libero di usare, modificare e ridistribuire, a patto di mantenere la nota di copyright. Contributi e issue benvenuti: se hai lo stesso router col firmware senza cloud, apri pure una PR.
