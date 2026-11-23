@@ -56,7 +56,7 @@
       <th data-k="node">Nodo</th>
       <th data-k="connection">Conness.</th>
       <th data-k="band">Banda</th>
-      <th data-k="signal_dbm">RSSI</th>
+      <th data-k="signal">Segnale</th>
       <th data-k="rate_mbps">Rate</th>
       <th data-k="type">Tipo</th>
       <th data-k="manufacturer">Produttore</th>
@@ -71,8 +71,9 @@
 let DATA = [];
 let sortKey = 'name', sortDir = 1;
 
-const rssiPill = r => r == null ? '<span class="muted">—</span>'
-  : `<span class="pill ${r>=-70?'ok':r>=-80?'warn':'bad'}">${r} dBm</span>`;
+// signalDecibels here is SNR-like: higher is better (not negative dBm).
+const sigPill = s => s == null ? '<span class="muted">—</span>'
+  : `<span class="pill ${s>=40?'ok':s>=25?'warn':'bad'}">${s}</span>`;
 const connPill = c => c === 'Wireless' ? '<span class="pill wired">Wi-Fi</span>'
   : c === 'Wired' ? '<span class="pill ok">cavo</span>' : '<span class="muted">—</span>';
 const cmp = (a, b) => {
@@ -100,8 +101,8 @@ function render() {
       + `<td class="muted">${c.mac||'—'}</td>`
       + `<td>${c.node||'—'}</td>`
       + `<td>${connPill(c.connection)}</td>`
-      + `<td>${c.band||'—'}</td>`
-      + `<td>${rssiPill(c.signal_dbm)}</td>`
+      + `<td>${c.band||'—'}${c.guest?' <span class="pill warn">guest</span>':''}</td>`
+      + `<td>${sigPill(c.signal)}</td>`
       + `<td>${c.rate_mbps!=null?Math.round(c.rate_mbps)+' Mbps':'—'}</td>`
       + `<td class="muted">${c.type||'—'}</td>`
       + `<td>${c.manufacturer||'—'}</td>`

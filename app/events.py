@@ -18,6 +18,18 @@ MAX_DAYS = 7          # how long to keep events in the file
 VIEW_DEFAULT_H = 24   # default window served to the UI
 
 
+def is_randomized_mac(mac: str) -> bool:
+    """True for locally-administered (randomized) MACs — bit 0x02 of octet 1.
+
+    Modern phones rotate these per-SSID, so they are noise for new-device
+    alerts and are excluded from them.
+    """
+    try:
+        return bool(int(mac.split(":")[0], 16) & 0x02)
+    except (ValueError, IndexError):
+        return False
+
+
 class EventStore:
     def __init__(self, data_dir: str = "/data"):
         self.dir = Path(data_dir)
@@ -111,7 +123,7 @@ class EventStore:
         }
         if self.seeded:
             for mac, c in online.items():
-                if mac not in self.known_macs:
+                if mac not in self.known_macs and not is_randomized_mac(mac):
                     self._add("new_device", now, mac=mac, name=c.get("name"),
                               ip=c.get("ip"), node=c.get("node"))
         self.known_macs |= set(online)
