@@ -51,6 +51,7 @@ class State:
     clients_total: int = 0
     clients_per_node: dict[str, int] = field(default_factory=dict)
     clients: list[dict] = field(default_factory=list)
+    leases: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -157,6 +158,28 @@ async def poll(client: JNAPClient) -> State:
 
         st.clients_total = sum(1 for c in st.clients if c["online"])
         st.clients_per_node = per_node
+
+        # DHCP leases (ARP-like view): merge leases + reservations + live status.
+        reserved: set[str] = set()
+        lan = await client.try_call("router/GetLANSettings")
+        if lan:
+            for r in (lan.get("dhcpSettings") or {}).get("reservations", []) or []:
+                reserved.add((r.get("macAddress") or "").upper())
+        by_mac = {c["mac"]: c for c in st.clients}
+        ld = await client.try_call("router/GetDHCPClientLeases")
+        if ld:
+            for lease in ld.get("leases", []) or []:
+                mac = (lease.get("macAddress") or "").upper()
+                c = by_mac.get(mac)
+                st.leases.append({
+                    "host": lease.get("hostName") or "",
+                    "ip": lease.get("ipAddress") or "",
+                    "mac": mac,
+                    "expiration": lease.get("expiration") or "",
+                    "type": "Riservato" if mac in reserved else "Dinamico",
+                    "online": bool(c and c.get("online")),
+                    "node": (c or {}).get("node", ""),
+                })
 
         # Backhaul (parent + per-link radio metrics)
         bh = await client.try_call("nodes/diagnostics/GetBackhaulInfo")

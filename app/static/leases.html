@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JNAP Velop · Lease</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, sans-serif;
+         background: #0e1116; color: #e6edf3; padding: 1.5rem; }
+  h1 { font-size: 1.2rem; margin: 0 0 .25rem; }
+  nav { margin: -.25rem 0 .75rem; font-size: .85rem; }
+  nav a { text-decoration: none; margin-right: 1rem; }
+  .sub { color: #8b949e; font-size: .8rem; margin-bottom: 1rem; }
+  .bar { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+  input[type=search] { padding: .45rem .7rem; width: 280px; background: #161b22;
+    border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; }
+  label { color: #8b949e; font-size: .82rem; display: flex; gap: .35rem; align-items: center; }
+  .count { color: #8b949e; font-size: .82rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid #21262d; white-space: nowrap; }
+  th { color: #adbac7; font-weight: 500; font-size: .72rem; text-transform: uppercase;
+       cursor: pointer; user-select: none; position: sticky; top: 0; background: #0e1116; }
+  th:hover { color: #fff; }
+  th.sorted::after { content: " ▲"; color: #58a6ff; }
+  th.sorted.desc::after { content: " ▼"; }
+  td.muted { color: #6e7681; }
+  tr:hover td { background: #11161d; }
+  .pill { padding: .1rem .5rem; border-radius: 999px; font-size: .72rem; font-weight: 600; }
+  .ok { background: #12301c; color: #3fb950; }
+  .off { background: #21262d; color: #6e7681; }
+  .res { background: #2a1a3a; color: #bc8cff; }
+  .dyn { background: #15233a; color: #58a6ff; }
+</style>
+</head>
+<body>
+  <h1>JNAP Velop</h1>
+  <nav>
+    <a href="/" style="color:#8b949e">Panoramica</a>
+    <a href="/clients" style="color:#8b949e">Client</a>
+    <a href="/leases" style="color:#58a6ff">Lease</a>
+    <a href="/events" style="color:#8b949e">Log</a>
+  </nav>
+  <div class="sub" id="meta">caricamento…</div>
+  <div class="bar">
+    <input type="search" id="q" placeholder="filtra (host, IP, MAC, nodo…)">
+    <label><input type="checkbox" id="onlyonline"> solo online</label>
+    <label><input type="checkbox" id="onlyres"> solo riservati</label>
+    <span class="count" id="count"></span>
+  </div>
+  <table id="t">
+    <thead><tr>
+      <th data-k="host">Host</th>
+      <th data-k="ip">IP</th>
+      <th data-k="mac">MAC</th>
+      <th data-k="type">Tipo</th>
+      <th data-k="node">Nodo</th>
+      <th data-k="expiration">Scadenza</th>
+      <th data-k="online">Stato</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+
+<script>
+let DATA = [], sortKey = 'ip', sortDir = 1;
+const ipNum = ip => (ip||'').split('.').reduce((a,o)=>a*256+(+o||0),0);
+
+const cmp = (a, b) => {
+  if (sortKey === 'ip') return (ipNum(a.ip) - ipNum(b.ip)) * sortDir;
+  const x = a[sortKey], y = b[sortKey];
+  if (x === y) return 0;
+  return String(x).localeCompare(String(y), 'it', {numeric:true}) * sortDir;
+};
+const expFmt = e => { const d = new Date(e); return isNaN(d) ? (e||'—') : d.toLocaleString('it-IT'); };
+
+function render() {
+  const q = document.getElementById('q').value.toLowerCase().trim();
+  const onOnline = document.getElementById('onlyonline').checked;
+  const onRes = document.getElementById('onlyres').checked;
+  let rows = DATA.filter(l => (!onOnline || l.online) && (!onRes || l.type === 'Riservato'));
+  if (q) rows = rows.filter(l => Object.values(l).some(v => String(v ?? '').toLowerCase().includes(q)));
+  rows.sort(cmp);
+
+  const tb = document.querySelector('#t tbody'); tb.innerHTML = '';
+  for (const l of rows) {
+    const tr = document.createElement('tr');
+    const type = l.type === 'Riservato' ? '<span class="pill res">riservato</span>' : '<span class="pill dyn">dinamico</span>';
+    const st = l.online ? '<span class="pill ok">online</span>' : '<span class="pill off">offline</span>';
+    tr.innerHTML = `<td>${l.host||'—'}</td><td class="muted">${l.ip||'—'}</td>`
+      + `<td class="muted">${l.mac||'—'}</td><td>${type}</td><td>${l.node||'—'}</td>`
+      + `<td class="muted">${expFmt(l.expiration)}</td><td>${st}</td>`;
+    tb.append(tr);
+  }
+  document.getElementById('count').textContent = `${rows.length} lease`;
+  document.querySelectorAll('th').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.k === sortKey);
+    th.classList.toggle('desc', th.dataset.k === sortKey && sortDir === -1);
+  });
+}
+
+document.querySelectorAll('th').forEach(th => th.addEventListener('click', () => {
+  const k = th.dataset.k;
+  if (k === sortKey) sortDir = -sortDir; else { sortKey = k; sortDir = 1; }
+  render();
+}));
+['q'].forEach(id => document.getElementById(id).addEventListener('input', render));
+['onlyonline','onlyres'].forEach(id => document.getElementById(id).addEventListener('change', render));
+
+async function load() {
+  try {
+    const d = await (await fetch('/api/leases')).json();
+    DATA = d.leases || [];
+    const res = DATA.filter(l => l.type === 'Riservato').length;
+    document.getElementById('meta').textContent =
+      `${DATA.length} lease (${res} riservati) · aggiornato ${d.updated_iso}`;
+    render();
+  } catch { document.getElementById('meta').textContent = 'API irraggiungibile'; }
+}
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>
