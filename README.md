@@ -7,6 +7,7 @@ firmware senza cloud) e offre:
 - **API JSON** (`/api/state`) — punto d'aggancio per integrazioni future (es. Teufelsberg);
 - **export verso Home Assistant** via MQTT discovery (i sensori compaiono da soli);
 - **healthcheck** (`/healthz`).
+- **pagina Client** (`/clients`) filtrabile e ordinabile, con API `/api/clients`.
 
 Stato letto da un unico snapshot (`app/poller.py`), condiviso da GUI, API e MQTT.
 

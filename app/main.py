@@ -75,7 +75,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="JNAP Velop", lifespan=lifespan)
 
-_INDEX = (Path(__file__).parent / "static" / "index.html").read_text()
+_STATIC = Path(__file__).parent / "static"
+_INDEX = (_STATIC / "index.html").read_text()
+_CLIENTS = (_STATIC / "clients.html").read_text()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -83,9 +85,22 @@ async def index() -> str:
     return _INDEX
 
 
+@app.get("/clients", response_class=HTMLResponse)
+async def clients_page() -> str:
+    return _CLIENTS
+
+
 @app.get("/api/state")
 async def api_state() -> JSONResponse:
     return JSONResponse(_state.to_dict())
+
+
+@app.get("/api/clients")
+async def api_clients() -> JSONResponse:
+    return JSONResponse({
+        "updated_iso": _state.to_dict()["updated_iso"],
+        "clients": _state.clients,
+    })
 
 
 @app.get("/healthz")
