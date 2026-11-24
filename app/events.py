@@ -141,9 +141,15 @@ class EventStore:
         self.last_nodes = cur_nodes
 
         # --- security posture drift ---
-        self._security_drift(state.security or {}, now)
+        # Skip while the mesh is unstable (e.g. a reboot): snapshots are
+        # unreliable then — the port-forward table briefly reads empty and
+        # would produce a storm of false added/removed events.
+        mesh_stable = bool(state.nodes) and all(n.online for n in state.nodes)
+        self._security_drift(state.security or {}, now, mesh_stable)
 
-    def _security_drift(self, sec: dict, now: float) -> None:
+    def _security_drift(self, sec: dict, now: float, mesh_stable: bool) -> None:
+        if not mesh_stable:
+            return  # don't compare or move the baseline during a reboot
         prev = self.last_security
         if prev is not None and sec:
             # risk transitions: a flag turning to the risky value
@@ -162,20 +168,29 @@ class EventStore:
                                "firewall_ipv6": "sec_firewall_off"}.items():
                 if prev.get(key) and sec.get(key) is False:
                     self._add(etype, now, setting=key)
-            # port-forward rules added/removed
-            def pf_set(s):
-                return {
-                    (r.get("external_port"), r.get("protocol"), r.get("internal_ip"))
-                    for r in (s.get("port_forwards") or [])
-                }
-            before, after = pf_set(prev), pf_set(sec)
-            for r in after - before:
-                self._add("sec_portforward_added", now,
-                          external_port=r[0], protocol=r[1], internal_ip=r[2])
-            for r in before - after:
-                self._add("sec_portforward_removed", now,
-                          external_port=r[0], protocol=r[1], internal_ip=r[2])
+            # port-forward rules added/removed — only ENABLED rules are
+            # actually exposed; a disabled rule appearing/disappearing is not.
+            # Only diff when both snapshots actually carried a reading.
+            if "port_forwards" in prev and "port_forwards" in sec:
+                def pf_set(s):
+                    return {
+                        (r.get("external_port"), r.get("protocol"),
+                         r.get("internal_ip"))
+                        for r in (s.get("port_forwards") or [])
+                        if r.get("enabled")
+                    }
+                before, after = pf_set(prev), pf_set(sec)
+                for r in after - before:
+                    self._add("sec_portforward_added", now,
+                              external_port=r[0], protocol=r[1], internal_ip=r[2])
+                for r in before - after:
+                    self._add("sec_portforward_removed", now,
+                              external_port=r[0], protocol=r[1], internal_ip=r[2])
         if sec:
+            # preserve a previous port-forward reading if this poll lacked one,
+            # so a failed read doesn't later look like everything was re-added
+            if "port_forwards" not in sec and prev and "port_forwards" in prev:
+                sec = {**sec, "port_forwards": prev["port_forwards"]}
             self.last_security = sec
 
     # ----- query ---------------------------------------------------------

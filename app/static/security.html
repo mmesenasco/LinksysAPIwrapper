@@ -44,11 +44,12 @@
   <h2>Postura</h2>
   <div class="grid" id="posture"></div>
 
-  <h2>Port forwarding (porte esposte verso Internet)</h2>
+  <h2>Port forwarding</h2>
+  <p class="sub" id="pfsummary"></p>
   <table id="pf"><thead><tr>
     <th>Descrizione</th><th>Porta esterna</th><th>Protocollo</th><th>IP interno</th><th>Stato</th>
   </tr></thead><tbody></tbody></table>
-  <div class="empty" id="pfempty" style="display:none">Nessuna porta inoltrata. ✔</div>
+  <div class="empty" id="pfempty" style="display:none">Nessuna regola di port forwarding. ✔</div>
 
 <script>
 // each: [label, value, risk]  risk: true=bad-when-on style handled per item
@@ -84,12 +85,20 @@ function render(sec) {
         sec.fw_update_policy === 'Off' ? 'warn' : 'ok'));
 
   const tb = document.querySelector('#pf tbody'); tb.innerHTML = '';
-  const pf = sec.port_forwards || [];
+  const pf = (sec.port_forwards || []).slice()
+    .sort((a, b) => (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0));  // active first
+  const active = pf.filter(r => r.enabled).length;
+  const disabled = pf.length - active;
+  document.getElementById('pfsummary').innerHTML = pf.length
+    ? `<strong>${active}</strong> regole attive (esposte verso Internet)`
+      + (disabled ? ` · ${disabled} disattivate` : '')
+    : '';
   for (const r of pf) {
     const tr = document.createElement('tr');
+    if (!r.enabled) tr.style.opacity = '0.5';
     tr.innerHTML = `<td>${r.description||'—'}</td><td>${r.external_port??'—'}</td>`
       + `<td>${r.protocol||'—'}</td><td class="muted2">${r.internal_ip||'—'}</td>`
-      + `<td>${r.enabled ? pill('attiva','warn') : pill('disattiva','muted')}</td>`;
+      + `<td>${r.enabled ? pill('esposta','warn') : pill('disattiva','muted')}</td>`;
     tb.append(tr);
   }
   document.getElementById('pfempty').style.display = pf.length ? 'none' : 'block';
