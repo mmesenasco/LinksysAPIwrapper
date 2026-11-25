@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from . import control
 from .events import EventStore
+from .health import ClientHealth
 from .jnap import JNAPClient, JNAPError
 from .mqtt_pub import MQTTPublisher
 from .poller import State, poll
@@ -39,6 +40,7 @@ _state = State()
 _state.error = "no poll yet"
 _client: JNAPClient | None = None   # shared master client, set in lifespan
 _events = EventStore(DATA_DIR)
+_health = ClientHealth()
 
 
 async def _loop(client: JNAPClient, pub: MQTTPublisher | None) -> None:
@@ -47,6 +49,9 @@ async def _loop(client: JNAPClient, pub: MQTTPublisher | None) -> None:
         _state = await poll(client)
         try:
             _events.update(_state)
+            _health.update(_state.clients)
+            for mac, node in _health.take_new_flapping():
+                _events.record("client_flapping", mac=mac, node=node)
         except Exception as exc:  # noqa: BLE001
             print(f"[events] update failed: {exc}", flush=True)
         if pub:
@@ -145,9 +150,10 @@ async def api_state() -> JSONResponse:
 
 @app.get("/api/clients")
 async def api_clients() -> JSONResponse:
+    clients = [{**c, "health": _health.metrics(c.get("mac"))} for c in _state.clients]
     return JSONResponse({
         "updated_iso": _state.to_dict()["updated_iso"],
-        "clients": _state.clients,
+        "clients": clients,
     })
 
 

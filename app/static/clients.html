@@ -48,6 +48,7 @@
   <div class="bar">
     <input type="search" id="q" placeholder="filtra (nome, IP, MAC, nodo, produttore…)">
     <label><input type="checkbox" id="onlyonline" checked> solo online</label>
+    <label><input type="checkbox" id="onlyproblem"> solo problematici</label>
     <span class="count" id="count"></span>
   </div>
   <table id="t">
@@ -64,6 +65,7 @@
       <th data-k="manufacturer">Produttore</th>
       <th data-k="model">Modello</th>
       <th data-k="os">OS</th>
+      <th data-k="_health">Salute</th>
       <th data-k="online">Stato</th>
     </tr></thead>
     <tbody></tbody>
@@ -78,8 +80,23 @@ const sigPill = s => s == null ? '<span class="muted">—</span>'
   : `<span class="pill ${s>=40?'ok':s>=25?'warn':'bad'}">${s}</span>`;
 const connPill = c => c === 'Wireless' ? '<span class="pill wired">Wi-Fi</span>'
   : c === 'Wired' ? '<span class="pill ok">cavo</span>' : '<span class="muted">—</span>';
+const HEALTH = {
+  flapping: ['instabile', 'bad'],
+  roaming: ['roaming', 'warn'],
+  weak: ['segnale debole', 'warn'],
+  stable: ['', ''],
+};
+function healthPill(h) {
+  if (!h || h.status === 'stable') return '<span class="muted">ok</span>';
+  const [label, cls] = HEALTH[h.status] || [h.status, 'warn'];
+  const detail = h.status === 'flapping' ? ` (${h.flaps})`
+    : h.status === 'roaming' ? ` (${h.roams})` : '';
+  return `<span class="pill ${cls}" title="flaps ${h.flaps} · roams ${h.roams} · campioni ${h.samples}">${label}${detail}</span>`;
+}
+const HEALTH_RANK = { flapping: 3, roaming: 2, weak: 1, stable: 0 };
 const cmp = (a, b) => {
-  const x = a[sortKey], y = b[sortKey];
+  let x = a[sortKey], y = b[sortKey];
+  if (sortKey === '_health') { x = HEALTH_RANK[(a.health||{}).status] || 0; y = HEALTH_RANK[(b.health||{}).status] || 0; }
   if (x == null && y == null) return 0;
   if (x == null) return 1; if (y == null) return -1;
   if (typeof x === 'number' && typeof y === 'number') return (x - y) * sortDir;
@@ -89,7 +106,9 @@ const cmp = (a, b) => {
 function render() {
   const q = document.getElementById('q').value.toLowerCase().trim();
   const onlyOnline = document.getElementById('onlyonline').checked;
+  const onlyProblem = document.getElementById('onlyproblem').checked;
   let rows = DATA.filter(c => !onlyOnline || c.online);
+  if (onlyProblem) rows = rows.filter(c => (c.health||{}).status && c.health.status !== 'stable');
   if (q) rows = rows.filter(c => Object.values(c).some(v => String(v ?? '').toLowerCase().includes(q)));
   rows.sort(cmp);
 
@@ -110,6 +129,7 @@ function render() {
       + `<td>${c.manufacturer||'—'}</td>`
       + `<td class="muted">${c.model||'—'}</td>`
       + `<td class="muted">${c.os||'—'}</td>`
+      + `<td>${healthPill(c.health)}</td>`
       + `<td>${online}</td>`;
     tb.append(tr);
   }
@@ -127,6 +147,7 @@ document.querySelectorAll('th').forEach(th => th.addEventListener('click', () =>
 }));
 document.getElementById('q').addEventListener('input', render);
 document.getElementById('onlyonline').addEventListener('change', render);
+document.getElementById('onlyproblem').addEventListener('change', render);
 
 async function load() {
   try {

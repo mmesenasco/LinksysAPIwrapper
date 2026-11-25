@@ -88,6 +88,10 @@ class EventStore:
             self.persist = False
 
     # ----- detection -----------------------------------------------------
+    def record(self, etype: str, **fields) -> None:
+        """Public: log an event now (used by callers outside the poll diff)."""
+        self._add(etype, time.time(), **fields)
+
     def _add(self, etype: str, ts: float, **fields) -> None:
         self._append({
             "ts": ts,

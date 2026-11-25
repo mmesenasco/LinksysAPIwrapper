@@ -56,6 +56,7 @@
         <option value="dfs_change">DFS</option>
         <option value="channel_change">Cambio canale</option>
         <option value="new_device">Nuovo dispositivo</option>
+        <option value="client_flapping">Dispositivo instabile</option>
         <option value="node_down">Nodo offline</option>
         <option value="node_up">Nodo online</option>
         <option value="security">Sicurezza</option>
@@ -79,6 +80,7 @@ const LABEL = {
   new_device: ['Nuovo disp.', 'newd'],
   node_down: ['Nodo giù', 'down'],
   node_up: ['Nodo su', 'up'],
+  client_flapping: ['Instabile', 'down'],
   sec_remote_mgmt_on: ['Sicurezza', 'down'],
   sec_dmz_on: ['Sicurezza', 'down'],
   sec_upnp_on: ['Sicurezza', 'down'],
@@ -106,6 +108,8 @@ function detail(e) {
     return `${e.name||'?'} · ${e.ip||'?'} · ${e.mac||''} su ${e.node||'?'}`;
   if (e.type === 'node_down' || e.type === 'node_up')
     return `${e.node}`;
+  if (e.type === 'client_flapping')
+    return `Dispositivo instabile (flapping): ${e.mac||'?'}${e.node?' su '+e.node:''}`;
   if (e.type === 'sec_portforward_added')
     return `Nuova porta esposta: ${e.external_port}/${e.protocol} → ${e.internal_ip}`;
   if (e.type === 'sec_portforward_removed')
