@@ -7,7 +7,7 @@ firmware senza cloud) e offre:
 - **API JSON** (`/api/state`) — punto d'aggancio per integrazioni future (es. Teufelsberg);
 - **export verso Home Assistant** via MQTT discovery (i sensori compaiono da soli);
 - **healthcheck** (`/healthz`).
-- **pagina Client** (`/clients`) filtrabile e ordinabile, con API `/api/clients`.
+- **pagina Client** (`/clients`) filtrabile e ordinabile, con colonna **Salute** (flapping / roaming / segnale debole su finestra mobile) e filtro "solo problematici"; API `/api/clients`.
 - **pagina Lease** (`/leases`) con la tabella DHCP/ARP (IP/MAC/host, riservato vs dinamico, scadenza, online, nodo), API `/api/leases`.
 - **pagina Sicurezza** (`/security`) con postura (firewall, gestione remota, DMZ, UPnP, WPS, password admin di default, ecc.) e porte esposte, API `/api/security`; drift di sicurezza registrati nel Log.
 - **pagina Log** (`/events`) con eventi DFS, nuovi dispositivi e nodi su/giù delle ultime 24h (persistiti su volume), API `/api/events`.
