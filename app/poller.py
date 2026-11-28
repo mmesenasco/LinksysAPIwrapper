@@ -175,14 +175,26 @@ async def poll(client: JNAPClient) -> State:
             if ip:
                 ip_to_name[ip] = name
 
-        # Optional live wireless metrics keyed by MAC (best effort).
+        # Live wireless metrics keyed by MAC (best effort). The master only
+        # knows the clients associated to ITSELF, so we also query each slave
+        # node on its own IP and merge — otherwise clients on the nodes have no
+        # signal/band/rate. Each client associates to one node, so no conflict.
         netmap: dict[str, dict] = {}
-        nc = await client.try_call("networkconnections/GetNetworkConnections")
-        if nc:
+
+        def _merge(nc: dict | None) -> None:
+            if not nc:
+                return
             for c in nc.get("connections", []) or []:
                 m = (c.get("macAddress") or "").upper()
                 if m:
                     netmap[m] = c
+
+        _merge(await client.try_call("networkconnections/GetNetworkConnections"))
+        for node in st.nodes:
+            if node.role == "Master" or not node.ip:
+                continue
+            _merge(await client.try_call_host(
+                f"http://{node.ip}", "networkconnections/GetNetworkConnections"))
 
         # Pass 2: clients (everything that is not a node).
         per_node: dict[str, int] = {}
