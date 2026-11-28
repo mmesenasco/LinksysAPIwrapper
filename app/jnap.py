@@ -66,3 +66,32 @@ class JNAPClient:
             return await self.call(action, body, auth)
         except (JNAPError, httpx.HTTPError):
             return None
+
+    async def try_call_host(
+        self, base_url: str, action: str, body: dict | None = None,
+        auth: bool = True, timeout: float = 5.0,
+    ) -> dict | None:
+        """Best-effort call to a JNAP action on ANOTHER host (e.g. a mesh node),
+        reusing this client's auth and HTTP pool. None on any error.
+
+        Velop slave nodes each speak JNAP on their own IP and accept the same
+        admin credentials as the master.
+        """
+        headers = {
+            "Content-Type": "application/json",
+            "X-JNAP-Action": JNAP_BASE + action,
+        }
+        if auth:
+            headers["X-JNAP-Authorization"] = self._auth
+        try:
+            resp = await self._client.post(
+                base_url.rstrip("/") + "/JNAP/", headers=headers,
+                json=body or {}, timeout=timeout,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("result") != "OK":
+                return None
+            return data.get("output", {})
+        except httpx.HTTPError:
+            return None
