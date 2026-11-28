@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -33,94 +33,94 @@
 <body>
   <h1>JNAP Velop</h1>
   <nav>
-    <a href="/" style="color:#8b949e">Panoramica</a>
-    <a href="/clients" style="color:#8b949e">Client</a>
-    <a href="/leases" style="color:#8b949e">Lease</a>
-    <a href="/security" style="color:#8b949e">Sicurezza</a>
+    <a href="/" style="color:#8b949e">Overview</a>
+    <a href="/clients" style="color:#8b949e">Clients</a>
+    <a href="/leases" style="color:#8b949e">Leases</a>
+    <a href="/security" style="color:#8b949e">Security</a>
     <a href="/events" style="color:#58a6ff">Log</a>
   </nav>
-  <div class="sub" id="meta">caricamento…</div>
+  <div class="sub" id="meta">loading…</div>
   <div class="bar">
-    <label class="count">Finestra
+    <label class="count">Window
       <select id="hours">
-        <option value="1">1 ora</option>
-        <option value="6">6 ore</option>
-        <option value="24" selected>24 ore</option>
-        <option value="72">3 giorni</option>
-        <option value="168">7 giorni</option>
+        <option value="1">1 hour</option>
+        <option value="6">6 hours</option>
+        <option value="24" selected>24 hours</option>
+        <option value="72">3 days</option>
+        <option value="168">7 days</option>
       </select>
     </label>
-    <label class="count">Tipo
+    <label class="count">Type
       <select id="type">
-        <option value="">tutti</option>
+        <option value="">all</option>
         <option value="dfs_change">DFS</option>
-        <option value="channel_change">Cambio canale</option>
-        <option value="new_device">Nuovo dispositivo</option>
-        <option value="client_flapping">Dispositivo instabile</option>
-        <option value="node_down">Nodo offline</option>
-        <option value="node_up">Nodo online</option>
-        <option value="security">Sicurezza</option>
+        <option value="channel_change">Channel change</option>
+        <option value="new_device">New device</option>
+        <option value="client_flapping">Unstable device</option>
+        <option value="node_down">Node offline</option>
+        <option value="node_up">Node online</option>
+        <option value="security">Security</option>
       </select>
     </label>
-    <input type="search" id="q" placeholder="filtra…">
+    <input type="search" id="q" placeholder="filter…">
     <span class="count" id="count"></span>
   </div>
   <table id="t">
-    <thead><tr><th style="width:11rem">Quando</th><th style="width:9rem">Evento</th><th>Dettaglio</th></tr></thead>
+    <thead><tr><th style="width:11rem">When</th><th style="width:9rem">Event</th><th>Detail</th></tr></thead>
     <tbody></tbody>
   </table>
-  <div class="empty" id="empty" style="display:none">Nessun evento nella finestra selezionata.</div>
+  <div class="empty" id="empty" style="display:none">No events in the selected window.</div>
 
 <script>
 let DATA = [];
 
 const LABEL = {
   dfs_change: ['DFS', 'dfs'],
-  channel_change: ['Canale', 'chan'],
-  new_device: ['Nuovo disp.', 'newd'],
-  node_down: ['Nodo giù', 'down'],
-  node_up: ['Nodo su', 'up'],
-  client_flapping: ['Instabile', 'down'],
-  sec_remote_mgmt_on: ['Sicurezza', 'down'],
-  sec_dmz_on: ['Sicurezza', 'down'],
-  sec_upnp_on: ['Sicurezza', 'down'],
-  sec_wps_on: ['Sicurezza', 'down'],
-  sec_admin_default: ['Sicurezza', 'down'],
-  sec_firewall_off: ['Sicurezza', 'down'],
-  sec_portforward_added: ['Sicurezza', 'down'],
-  sec_portforward_removed: ['Sicurezza', 'up'],
+  channel_change: ['Channel', 'chan'],
+  new_device: ['New dev.', 'newd'],
+  node_down: ['Node down', 'down'],
+  node_up: ['Node up', 'up'],
+  client_flapping: ['Unstable', 'down'],
+  sec_remote_mgmt_on: ['Security', 'down'],
+  sec_dmz_on: ['Security', 'down'],
+  sec_upnp_on: ['Security', 'down'],
+  sec_wps_on: ['Security', 'down'],
+  sec_admin_default: ['Security', 'down'],
+  sec_firewall_off: ['Security', 'down'],
+  sec_portforward_added: ['Security', 'down'],
+  sec_portforward_removed: ['Security', 'up'],
 };
 
 const SEC_MSG = {
-  sec_remote_mgmt_on: 'Gestione remota (WAN) RIATTIVATA',
-  sec_dmz_on: 'DMZ attivata',
-  sec_upnp_on: 'UPnP attivato',
-  sec_wps_on: 'WPS attivato',
-  sec_admin_default: 'Password admin tornata di default',
-  sec_firewall_off: 'Firewall disattivato',
+  sec_remote_mgmt_on: 'Remote management (WAN) RE-ENABLED',
+  sec_dmz_on: 'DMZ enabled',
+  sec_upnp_on: 'UPnP enabled',
+  sec_wps_on: 'WPS enabled',
+  sec_admin_default: 'Admin password reset to default',
+  sec_firewall_off: 'Firewall disabled',
 };
 
 function detail(e) {
   if (e.type === 'dfs_change' || e.type === 'channel_change')
-    return `${e.node}: canale ${e.from_channel} → ${e.to_channel} (${e.band||'?'})`
+    return `${e.node}: channel ${e.from_channel} → ${e.to_channel} (${e.band||'?'})`
       + (e.dfs ? ' <span class="pill dfs">DFS</span>' : '');
   if (e.type === 'new_device')
-    return `${e.name||'?'} · ${e.ip||'?'} · ${e.mac||''} su ${e.node||'?'}`;
+    return `${e.name||'?'} · ${e.ip||'?'} · ${e.mac||''} on ${e.node||'?'}`;
   if (e.type === 'node_down' || e.type === 'node_up')
     return `${e.node}`;
   if (e.type === 'client_flapping')
-    return `Dispositivo instabile (flapping): ${e.mac||'?'}${e.node?' su '+e.node:''}`;
+    return `Unstable device (flapping): ${e.mac||'?'}${e.node?' on '+e.node:''}`;
   if (e.type === 'sec_portforward_added')
-    return `Nuova porta esposta: ${e.external_port}/${e.protocol} → ${e.internal_ip}`;
+    return `New exposed port: ${e.external_port}/${e.protocol} → ${e.internal_ip}`;
   if (e.type === 'sec_portforward_removed')
-    return `Porta chiusa: ${e.external_port}/${e.protocol} → ${e.internal_ip}`;
+    return `Port closed: ${e.external_port}/${e.protocol} → ${e.internal_ip}`;
   if (e.type in SEC_MSG) return SEC_MSG[e.type];
   return JSON.stringify(e);
 }
 
 function fmtTime(iso) {
   const d = new Date(iso);
-  return isNaN(d) ? iso : d.toLocaleString('it-IT');
+  return isNaN(d) ? iso : d.toLocaleString('en-GB');
 }
 
 function render() {
@@ -140,7 +140,7 @@ function render() {
       + `<td>${detail(e)}</td>`;
     tb.append(tr);
   }
-  document.getElementById('count').textContent = `${rows.length} eventi`;
+  document.getElementById('count').textContent = `${rows.length} events`;
   document.getElementById('empty').style.display = rows.length ? 'none' : 'block';
 }
 
@@ -149,9 +149,9 @@ async function load() {
   try {
     const d = await (await fetch(`/api/events?hours=${h}`)).json();
     DATA = d.events || [];
-    document.getElementById('meta').textContent = `ultime ${d.hours} ore · ${DATA.length} eventi registrati`;
+    document.getElementById('meta').textContent = `last ${d.hours} hours · ${DATA.length} events recorded`;
     render();
-  } catch { document.getElementById('meta').textContent = 'API irraggiungibile'; }
+  } catch { document.getElementById('meta').textContent = 'API unreachable'; }
 }
 
 ['hours'].forEach(id => document.getElementById(id).addEventListener('change', load));
