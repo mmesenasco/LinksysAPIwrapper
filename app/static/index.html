@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -31,36 +31,36 @@
 <body>
   <h1>JNAP Velop</h1>
   <nav style="margin:-.25rem 0 .75rem;font-size:.85rem">
-    <a href="/" style="color:#58a6ff;text-decoration:none;margin-right:1rem">Panoramica</a>
-    <a href="/clients" style="color:#8b949e;text-decoration:none;margin-right:1rem">Client</a>
-    <a href="/leases" style="color:#8b949e;text-decoration:none;margin-right:1rem">Lease</a>
-    <a href="/security" style="color:#8b949e;text-decoration:none;margin-right:1rem">Sicurezza</a>
+    <a href="/" style="color:#58a6ff;text-decoration:none;margin-right:1rem">Overview</a>
+    <a href="/clients" style="color:#8b949e;text-decoration:none;margin-right:1rem">Clients</a>
+    <a href="/leases" style="color:#8b949e;text-decoration:none;margin-right:1rem">Leases</a>
+    <a href="/security" style="color:#8b949e;text-decoration:none;margin-right:1rem">Security</a>
     <a href="/events" style="color:#8b949e;text-decoration:none">Log</a>
   </nav>
-  <div class="sub" id="meta">caricamento…</div>
+  <div class="sub" id="meta">loading…</div>
   <div id="err"></div>
   <div class="grid" id="cards"></div>
   <h2>Backhaul</h2>
   <table id="bh"><thead><tr>
-    <th>Nodo</th><th>Parent</th><th>Tipo</th><th>Banda</th><th>Canale</th>
-    <th>RSSI</th><th>Velocità</th>
+    <th>Node</th><th>Parent</th><th>Type</th><th>Band</th><th>Channel</th>
+    <th>RSSI</th><th>Speed</th>
   </tr></thead><tbody></tbody></table>
-  <h2>Nodi</h2>
+  <h2>Nodes</h2>
   <table id="nodes"><thead><tr>
-    <th>Posizione</th><th>Modello</th><th>IP</th><th>Firmware</th><th>Stato</th><th></th>
+    <th>Location</th><th>Model</th><th>IP</th><th>Firmware</th><th>Status</th><th></th>
   </tr></thead><tbody></tbody></table>
 
   <section id="mgmt" style="display:none">
-    <h2>Prenotazioni DHCP</h2>
-    <table id="res"><thead><tr><th>MAC</th><th>IP</th><th>Descrizione</th><th></th></tr></thead><tbody></tbody></table>
+    <h2>DHCP reservations</h2>
+    <table id="res"><thead><tr><th>MAC</th><th>IP</th><th>Description</th><th></th></tr></thead><tbody></tbody></table>
     <form id="resform" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.5rem">
       <input name="mac" placeholder="AA:BB:CC:DD:EE:FF" required
              style="padding:.4rem;background:#0e1116;border:1px solid #30363d;border-radius:6px;color:#e6edf3">
       <input name="ip" placeholder="192.168.1.xxx" required
              style="padding:.4rem;background:#0e1116;border:1px solid #30363d;border-radius:6px;color:#e6edf3">
-      <input name="description" placeholder="descrizione" required
+      <input name="description" placeholder="description" required
              style="padding:.4rem;background:#0e1116;border:1px solid #30363d;border-radius:6px;color:#e6edf3">
-      <button style="padding:.4rem .8rem;background:#238636;border:0;border-radius:6px;color:#fff;cursor:pointer">Aggiungi</button>
+      <button style="padding:.4rem .8rem;background:#238636;border:0;border-radius:6px;color:#fff;cursor:pointer">Add</button>
     </form>
     <div id="msg" style="margin-top:.5rem;font-size:.82rem"></div>
   </section>
@@ -73,19 +73,19 @@ const el = (t, c, h) => { const e = document.createElement(t); if (c) e.classNam
 async function tick() {
   let s;
   try { s = await (await fetch('/api/state')).json(); }
-  catch (e) { document.getElementById('err').textContent = 'API irraggiungibile'; return; }
+  catch (e) { document.getElementById('err').textContent = 'API unreachable'; return; }
 
-  document.getElementById('err').textContent = s.error && !s.ok ? ('Errore: ' + s.error) : '';
+  document.getElementById('err').textContent = s.error && !s.ok ? ('Error: ' + s.error) : '';
   document.getElementById('meta').textContent =
-    `aggiornato ${s.updated_iso} · poll ${s.poll_seconds}s · router ${s.router.model||'?'} fw ${s.router.firmware||'?'}`;
+    `updated ${s.updated_iso} · poll ${s.poll_seconds}s · router ${s.router.model||'?'} fw ${s.router.firmware||'?'}`;
 
   const cards = document.getElementById('cards'); cards.innerHTML = '';
   const add = (k, v) => { const c = el('div','card'); c.append(el('div','k',k), el('div','v',v)); cards.append(c); };
-  add('Stato', s.ok ? '<span class="pill ok">OK</span>' : '<span class="pill bad">KO</span>');
-  add('Client online', s.clients_total);
-  add('Nodi', s.nodes.length);
+  add('Status', s.ok ? '<span class="pill ok">OK</span>' : '<span class="pill bad">KO</span>');
+  add('Clients online', s.clients_total);
+  add('Nodes', s.nodes.length);
   const dfs = (s.backhaul||[]).filter(b => b.is_dfs).length;
-  add('Link su DFS', dfs ? `<span class="pill dfs">${dfs}</span>` : '0');
+  add('DFS links', dfs ? `<span class="pill dfs">${dfs}</span>` : '0');
   if (s.wan && s.wan.status) add('WAN', s.wan.status);
 
   const bh = document.querySelector('#bh tbody'); bh.innerHTML = '';
@@ -106,7 +106,7 @@ async function tick() {
     const tr = el('tr');
     const st = n.online ? '<span class="pill ok">online</span>' : '<span class="pill bad">offline</span>';
     const btn = WRITES
-      ? `<button data-ip="${n.ip}" class="reboot" style="padding:.2rem .6rem;background:#30363d;border:0;border-radius:6px;color:#e6edf3;cursor:pointer">riavvia</button>`
+      ? `<button data-ip="${n.ip}" class="reboot" style="padding:.2rem .6rem;background:#30363d;border:0;border-radius:6px;color:#e6edf3;cursor:pointer">reboot</button>`
       : '';
     tr.innerHTML = `<td>${n.location}</td><td>${n.model}</td><td class="muted">${n.ip}</td>`
       + `<td class="muted">${n.firmware}</td><td>${st}</td><td>${btn}</td>`;
@@ -122,7 +122,7 @@ async function loadReservations() {
   catch { return; }
   (data.reservations || []).forEach(r => {
     const tr = el('tr');
-    const del = `<button data-mac="${r.macAddress}" class="delres" style="padding:.2rem .6rem;background:#3a1518;border:0;border-radius:6px;color:#f85149;cursor:pointer">rimuovi</button>`;
+    const del = `<button data-mac="${r.macAddress}" class="delres" style="padding:.2rem .6rem;background:#3a1518;border:0;border-radius:6px;color:#f85149;cursor:pointer">remove</button>`;
     tr.innerHTML = `<td class="muted">${r.macAddress}</td><td>${r.ipAddress}</td><td>${r.description||''}</td><td>${del}</td>`;
     tb.append(tr);
   });
@@ -132,16 +132,16 @@ async function loadReservations() {
 document.addEventListener('click', async (e) => {
   const rb = e.target.closest('.reboot');
   if (rb) {
-    if (!confirm(`Riavviare il nodo ${rb.dataset.ip}?`)) return;
+    if (!confirm(`Reboot node ${rb.dataset.ip}?`)) return;
     const r = await fetch(`/api/nodes/${rb.dataset.ip}/reboot`, {method:'POST'});
-    msg(r.ok ? `Riavvio inviato a ${rb.dataset.ip}` : `Errore: ${(await r.json()).detail}`, r.ok);
+    msg(r.ok ? `Reboot sent to ${rb.dataset.ip}` : `Error: ${(await r.json()).detail}`, r.ok);
     return;
   }
   const dl = e.target.closest('.delres');
   if (dl) {
-    if (!confirm(`Rimuovere la prenotazione ${dl.dataset.mac}?`)) return;
+    if (!confirm(`Remove reservation ${dl.dataset.mac}?`)) return;
     const r = await fetch(`/api/reservations/${dl.dataset.mac}`, {method:'DELETE'});
-    msg(r.ok ? 'Prenotazione rimossa' : `Errore: ${(await r.json()).detail}`, r.ok);
+    msg(r.ok ? 'Reservation removed' : `Error: ${(await r.json()).detail}`, r.ok);
     loadReservations();
   }
 });
@@ -151,8 +151,8 @@ document.getElementById('resform').addEventListener('submit', async (e) => {
   const f = e.target;
   const body = {mac: f.mac.value, ip: f.ip.value, description: f.description.value};
   const r = await fetch('/api/reservations', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-  if (r.ok) { msg('Prenotazione salvata', true); f.reset(); loadReservations(); }
-  else { msg(`Errore: ${(await r.json()).detail}`, false); }
+  if (r.ok) { msg('Reservation saved', true); f.reset(); loadReservations(); }
+  else { msg(`Error: ${(await r.json()).detail}`, false); }
 });
 
 async function init() {

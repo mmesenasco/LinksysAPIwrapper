@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JNAP Velop · Sicurezza</title>
+<title>JNAP Velop · Security</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -33,23 +33,23 @@
 <body>
   <h1>JNAP Velop</h1>
   <nav>
-    <a href="/" style="color:#8b949e">Panoramica</a>
-    <a href="/clients" style="color:#8b949e">Client</a>
-    <a href="/leases" style="color:#8b949e">Lease</a>
-    <a href="/security" style="color:#58a6ff">Sicurezza</a>
+    <a href="/" style="color:#8b949e">Overview</a>
+    <a href="/clients" style="color:#8b949e">Clients</a>
+    <a href="/leases" style="color:#8b949e">Leases</a>
+    <a href="/security" style="color:#58a6ff">Security</a>
     <a href="/events" style="color:#8b949e">Log</a>
   </nav>
-  <div class="sub" id="meta">caricamento…</div>
+  <div class="sub" id="meta">loading…</div>
 
-  <h2>Postura</h2>
+  <h2>Posture</h2>
   <div class="grid" id="posture"></div>
 
   <h2>Port forwarding</h2>
   <p class="sub" id="pfsummary"></p>
   <table id="pf"><thead><tr>
-    <th>Descrizione</th><th>Porta esterna</th><th>Protocollo</th><th>IP interno</th><th>Stato</th>
+    <th>Description</th><th>External port</th><th>Protocol</th><th>Internal IP</th><th>State</th>
   </tr></thead><tbody></tbody></table>
-  <div class="empty" id="pfempty" style="display:none">Nessuna regola di port forwarding. ✔</div>
+  <div class="empty" id="pfempty" style="display:none">No port forwarding rules. ✔</div>
 
 <script>
 // each: [label, value, risk]  risk: true=bad-when-on style handled per item
@@ -61,27 +61,27 @@ function render(sec) {
     const c = document.createElement('div'); c.className = 'card';
     c.innerHTML = `<span class="k">${k}</span>${html}`; P.append(c);
   };
-  const onoff = (v, goodWhenOn) => v == null ? pill('n/d','muted')
+  const onoff = (v, goodWhenOn) => v == null ? pill('n/a','muted')
     : v ? pill('ON', goodWhenOn ? 'ok' : 'bad') : pill('OFF', goodWhenOn ? 'bad' : 'ok');
 
-  add('Gestione remota (WAN)', onoff(sec.manage_remote, false));
+  add('Remote management (WAN)', onoff(sec.manage_remote, false));
   add('Firewall IPv4', onoff(sec.firewall_ipv4, true));
   add('Firewall IPv6', onoff(sec.firewall_ipv6, true));
   add('Block anonymous requests', onoff(sec.block_anonymous, true));
   add('DMZ', onoff(sec.dmz, false));
   add('UPnP', onoff(sec.upnp, false));
   add('WPS', onoff(sec.wps, false));
-  add('Password admin di default', sec.admin_default == null ? pill('n/d','muted')
-      : sec.admin_default ? pill('SÌ — cambiala','bad') : pill('No','ok'));
-  add('Gestione via HTTP', onoff(sec.manage_http, false));
-  add('Gestione via HTTPS', onoff(sec.manage_https, true));
-  add('Rete guest', sec.guest_enabled == null ? pill('n/d','muted')
+  add('Default admin password', sec.admin_default == null ? pill('n/a','muted')
+      : sec.admin_default ? pill('YES — change it','bad') : pill('No','ok'));
+  add('Management over HTTP', onoff(sec.manage_http, false));
+  add('Management over HTTPS', onoff(sec.manage_https, true));
+  add('Guest network', sec.guest_enabled == null ? pill('n/a','muted')
       : pill(sec.guest_enabled ? ('ON · '+(sec.guest_ssid||'')) : 'OFF', 'muted'));
   if (sec.mac_filter_mode !== undefined)
-    add('Filtro MAC', pill((sec.mac_filter_mode||'?') + (sec.mac_filter_count?` · ${sec.mac_filter_count}`:''),
+    add('MAC filter', pill((sec.mac_filter_mode||'?') + (sec.mac_filter_count?` · ${sec.mac_filter_count}`:''),
         sec.mac_filter_mode === 'Disabled' ? 'muted' : 'ok'));
   if (sec.fw_update_policy !== undefined)
-    add('Aggiornamenti firmware', pill(sec.fw_update_policy || '?',
+    add('Firmware updates', pill(sec.fw_update_policy || '?',
         sec.fw_update_policy === 'Off' ? 'warn' : 'ok'));
 
   const tb = document.querySelector('#pf tbody'); tb.innerHTML = '';
@@ -90,15 +90,15 @@ function render(sec) {
   const active = pf.filter(r => r.enabled).length;
   const disabled = pf.length - active;
   document.getElementById('pfsummary').innerHTML = pf.length
-    ? `<strong>${active}</strong> regole attive (esposte verso Internet)`
-      + (disabled ? ` · ${disabled} disattivate` : '')
+    ? `<strong>${active}</strong> active rules (exposed to the Internet)`
+      + (disabled ? ` · ${disabled} disabled` : '')
     : '';
   for (const r of pf) {
     const tr = document.createElement('tr');
     if (!r.enabled) tr.style.opacity = '0.5';
     tr.innerHTML = `<td>${r.description||'—'}</td><td>${r.external_port??'—'}</td>`
       + `<td>${r.protocol||'—'}</td><td class="muted2">${r.internal_ip||'—'}</td>`
-      + `<td>${r.enabled ? pill('esposta','warn') : pill('disattiva','muted')}</td>`;
+      + `<td>${r.enabled ? pill('exposed','warn') : pill('disabled','muted')}</td>`;
     tb.append(tr);
   }
   document.getElementById('pfempty').style.display = pf.length ? 'none' : 'block';
@@ -108,9 +108,9 @@ function render(sec) {
 async function load() {
   try {
     const d = await (await fetch('/api/security')).json();
-    document.getElementById('meta').textContent = `aggiornato ${d.updated_iso}`;
+    document.getElementById('meta').textContent = `updated ${d.updated_iso}`;
     render(d.security || {});
-  } catch { document.getElementById('meta').textContent = 'API irraggiungibile'; }
+  } catch { document.getElementById('meta').textContent = 'API unreachable'; }
 }
 load();
 setInterval(load, 15000);

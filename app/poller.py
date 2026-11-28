@@ -268,7 +268,7 @@ async def poll(client: JNAPClient) -> State:
                     "ip": lease.get("ipAddress") or "",
                     "mac": mac,
                     "expiration": lease.get("expiration") or "",
-                    "type": "Riservato" if mac in reserved else "Dinamico",
+                    "type": "Reserved" if mac in reserved else "Dynamic",
                     "online": bool(c and c.get("online")),
                     "node": (c or {}).get("node", ""),
                 })

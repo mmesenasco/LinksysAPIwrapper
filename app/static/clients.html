@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JNAP Velop · Client</title>
+<title>JNAP Velop · Clients</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -38,35 +38,35 @@
 <body>
   <h1>JNAP Velop</h1>
   <nav>
-    <a href="/" style="color:#8b949e">Panoramica</a>
-    <a href="/clients" style="color:#58a6ff">Client</a>
-    <a href="/leases" style="color:#8b949e">Lease</a>
-    <a href="/security" style="color:#8b949e">Sicurezza</a>
+    <a href="/" style="color:#8b949e">Overview</a>
+    <a href="/clients" style="color:#58a6ff">Clients</a>
+    <a href="/leases" style="color:#8b949e">Leases</a>
+    <a href="/security" style="color:#8b949e">Security</a>
     <a href="/events" style="color:#8b949e">Log</a>
   </nav>
-  <div class="sub" id="meta">caricamento…</div>
+  <div class="sub" id="meta">loading…</div>
   <div class="bar">
-    <input type="search" id="q" placeholder="filtra (nome, IP, MAC, nodo, produttore…)">
-    <label><input type="checkbox" id="onlyonline" checked> solo online</label>
-    <label><input type="checkbox" id="onlyproblem"> solo problematici</label>
+    <input type="search" id="q" placeholder="filter (name, IP, MAC, node, manufacturer…)">
+    <label><input type="checkbox" id="onlyonline" checked> online only</label>
+    <label><input type="checkbox" id="onlyproblem"> problems only</label>
     <span class="count" id="count"></span>
   </div>
   <table id="t">
     <thead><tr>
-      <th data-k="name">Nome</th>
+      <th data-k="name">Name</th>
       <th data-k="ip">IP</th>
       <th data-k="mac">MAC</th>
-      <th data-k="node">Nodo</th>
-      <th data-k="connection">Conness.</th>
-      <th data-k="band">Banda</th>
-      <th data-k="signal">Segnale</th>
+      <th data-k="node">Node</th>
+      <th data-k="connection">Conn.</th>
+      <th data-k="band">Band</th>
+      <th data-k="signal">Signal</th>
       <th data-k="rate_mbps">Rate</th>
-      <th data-k="type">Tipo</th>
-      <th data-k="manufacturer">Produttore</th>
-      <th data-k="model">Modello</th>
+      <th data-k="type">Type</th>
+      <th data-k="manufacturer">Manufacturer</th>
+      <th data-k="model">Model</th>
       <th data-k="os">OS</th>
-      <th data-k="_health">Salute</th>
-      <th data-k="online">Stato</th>
+      <th data-k="_health">Health</th>
+      <th data-k="online">Status</th>
     </tr></thead>
     <tbody></tbody>
   </table>
@@ -79,11 +79,11 @@ let sortKey = 'name', sortDir = 1;
 const sigPill = s => s == null ? '<span class="muted">—</span>'
   : `<span class="pill ${s>=40?'ok':s>=25?'warn':'bad'}">${s}</span>`;
 const connPill = c => c === 'Wireless' ? '<span class="pill wired">Wi-Fi</span>'
-  : c === 'Wired' ? '<span class="pill ok">cavo</span>' : '<span class="muted">—</span>';
+  : c === 'Wired' ? '<span class="pill ok">wired</span>' : '<span class="muted">—</span>';
 const HEALTH = {
-  flapping: ['instabile', 'bad'],
+  flapping: ['flapping', 'bad'],
   roaming: ['roaming', 'warn'],
-  weak: ['segnale debole', 'warn'],
+  weak: ['weak signal', 'warn'],
   stable: ['', ''],
 };
 function healthPill(h) {
@@ -91,7 +91,7 @@ function healthPill(h) {
   const [label, cls] = HEALTH[h.status] || [h.status, 'warn'];
   const detail = h.status === 'flapping' ? ` (${h.flaps})`
     : h.status === 'roaming' ? ` (${h.roams})` : '';
-  return `<span class="pill ${cls}" title="flaps ${h.flaps} · roams ${h.roams} · campioni ${h.samples}">${label}${detail}</span>`;
+  return `<span class="pill ${cls}" title="flaps ${h.flaps} · roams ${h.roams} · samples ${h.samples}">${label}${detail}</span>`;
 }
 const HEALTH_RANK = { flapping: 3, roaming: 2, weak: 1, stable: 0 };
 const cmp = (a, b) => {
@@ -100,7 +100,7 @@ const cmp = (a, b) => {
   if (x == null && y == null) return 0;
   if (x == null) return 1; if (y == null) return -1;
   if (typeof x === 'number' && typeof y === 'number') return (x - y) * sortDir;
-  return String(x).localeCompare(String(y), 'it', {numeric:true}) * sortDir;
+  return String(x).localeCompare(String(y), 'en', {numeric:true}) * sortDir;
 };
 
 function render() {
@@ -133,7 +133,7 @@ function render() {
       + `<td>${online}</td>`;
     tb.append(tr);
   }
-  document.getElementById('count').textContent = `${rows.length} client`;
+  document.getElementById('count').textContent = `${rows.length} clients`;
   document.querySelectorAll('th').forEach(th => {
     th.classList.toggle('sorted', th.dataset.k === sortKey);
     th.classList.toggle('desc', th.dataset.k === sortKey && sortDir === -1);
@@ -153,9 +153,9 @@ async function load() {
   try {
     const d = await (await fetch('/api/clients')).json();
     DATA = d.clients || [];
-    document.getElementById('meta').textContent = `${DATA.length} dispositivi noti · aggiornato ${d.updated_iso}`;
+    document.getElementById('meta').textContent = `${DATA.length} known devices · updated ${d.updated_iso}`;
     render();
-  } catch { document.getElementById('meta').textContent = 'API irraggiungibile'; }
+  } catch { document.getElementById('meta').textContent = 'API unreachable'; }
 }
 load();
 setInterval(load, 10000);

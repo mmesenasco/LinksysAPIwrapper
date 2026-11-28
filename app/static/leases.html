@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JNAP Velop · Lease</title>
+<title>JNAP Velop · Leases</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -37,17 +37,17 @@
 <body>
   <h1>JNAP Velop</h1>
   <nav>
-    <a href="/" style="color:#8b949e">Panoramica</a>
-    <a href="/clients" style="color:#8b949e">Client</a>
-    <a href="/leases" style="color:#58a6ff">Lease</a>
-    <a href="/security" style="color:#8b949e">Sicurezza</a>
+    <a href="/" style="color:#8b949e">Overview</a>
+    <a href="/clients" style="color:#8b949e">Clients</a>
+    <a href="/leases" style="color:#58a6ff">Leases</a>
+    <a href="/security" style="color:#8b949e">Security</a>
     <a href="/events" style="color:#8b949e">Log</a>
   </nav>
-  <div class="sub" id="meta">caricamento…</div>
+  <div class="sub" id="meta">loading…</div>
   <div class="bar">
-    <input type="search" id="q" placeholder="filtra (host, IP, MAC, nodo…)">
-    <label><input type="checkbox" id="onlyonline"> solo online</label>
-    <label><input type="checkbox" id="onlyres"> solo riservati</label>
+    <input type="search" id="q" placeholder="filter (host, IP, MAC, node…)">
+    <label><input type="checkbox" id="onlyonline"> online only</label>
+    <label><input type="checkbox" id="onlyres"> reserved only</label>
     <span class="count" id="count"></span>
   </div>
   <table id="t">
@@ -55,10 +55,10 @@
       <th data-k="host">Host</th>
       <th data-k="ip">IP</th>
       <th data-k="mac">MAC</th>
-      <th data-k="type">Tipo</th>
-      <th data-k="node">Nodo</th>
-      <th data-k="expiration">Scadenza</th>
-      <th data-k="online">Stato</th>
+      <th data-k="type">Type</th>
+      <th data-k="node">Node</th>
+      <th data-k="expiration">Expiry</th>
+      <th data-k="online">Status</th>
     </tr></thead>
     <tbody></tbody>
   </table>
@@ -71,29 +71,29 @@ const cmp = (a, b) => {
   if (sortKey === 'ip') return (ipNum(a.ip) - ipNum(b.ip)) * sortDir;
   const x = a[sortKey], y = b[sortKey];
   if (x === y) return 0;
-  return String(x).localeCompare(String(y), 'it', {numeric:true}) * sortDir;
+  return String(x).localeCompare(String(y), 'en', {numeric:true}) * sortDir;
 };
-const expFmt = e => { const d = new Date(e); return isNaN(d) ? (e||'—') : d.toLocaleString('it-IT'); };
+const expFmt = e => { const d = new Date(e); return isNaN(d) ? (e||'—') : d.toLocaleString('en-GB'); };
 
 function render() {
   const q = document.getElementById('q').value.toLowerCase().trim();
   const onOnline = document.getElementById('onlyonline').checked;
   const onRes = document.getElementById('onlyres').checked;
-  let rows = DATA.filter(l => (!onOnline || l.online) && (!onRes || l.type === 'Riservato'));
+  let rows = DATA.filter(l => (!onOnline || l.online) && (!onRes || l.type === 'Reserved'));
   if (q) rows = rows.filter(l => Object.values(l).some(v => String(v ?? '').toLowerCase().includes(q)));
   rows.sort(cmp);
 
   const tb = document.querySelector('#t tbody'); tb.innerHTML = '';
   for (const l of rows) {
     const tr = document.createElement('tr');
-    const type = l.type === 'Riservato' ? '<span class="pill res">riservato</span>' : '<span class="pill dyn">dinamico</span>';
+    const type = l.type === 'Reserved' ? '<span class="pill res">reserved</span>' : '<span class="pill dyn">dynamic</span>';
     const st = l.online ? '<span class="pill ok">online</span>' : '<span class="pill off">offline</span>';
     tr.innerHTML = `<td>${l.host||'—'}</td><td class="muted">${l.ip||'—'}</td>`
       + `<td class="muted">${l.mac||'—'}</td><td>${type}</td><td>${l.node||'—'}</td>`
       + `<td class="muted">${expFmt(l.expiration)}</td><td>${st}</td>`;
     tb.append(tr);
   }
-  document.getElementById('count').textContent = `${rows.length} lease`;
+  document.getElementById('count').textContent = `${rows.length} leases`;
   document.querySelectorAll('th').forEach(th => {
     th.classList.toggle('sorted', th.dataset.k === sortKey);
     th.classList.toggle('desc', th.dataset.k === sortKey && sortDir === -1);
@@ -112,11 +112,11 @@ async function load() {
   try {
     const d = await (await fetch('/api/leases')).json();
     DATA = d.leases || [];
-    const res = DATA.filter(l => l.type === 'Riservato').length;
+    const res = DATA.filter(l => l.type === 'Reserved').length;
     document.getElementById('meta').textContent =
-      `${DATA.length} lease (${res} riservati) · aggiornato ${d.updated_iso}`;
+      `${DATA.length} leases (${res} reserved) · updated ${d.updated_iso}`;
     render();
-  } catch { document.getElementById('meta').textContent = 'API irraggiungibile'; }
+  } catch { document.getElementById('meta').textContent = 'API unreachable'; }
 }
 load();
 setInterval(load, 15000);

@@ -1,109 +1,115 @@
 # JNAP Velop
 
-Servizio autonomo che interroga il mesh Linksys Velop / MR9000 via JNAP (HTTP,
-firmware senza cloud) e offre:
+Standalone service that talks to a Linksys Velop / MR9000 mesh over JNAP (HTTP,
+cloud-less firmware) and provides:
 
-- **GUI web** leggera (`/`) con nodi, backhaul (RSSI / canale / velocità / flag DFS), client, stato WAN;
-- **API JSON** (`/api/state`) — punto d'aggancio per integrazioni future (es. Teufelsberg);
-- **export verso Home Assistant** via MQTT discovery (i sensori compaiono da soli);
-- **healthcheck** (`/healthz`).
-- **pagina Client** (`/clients`) filtrabile e ordinabile, con colonna **Salute** (flapping / roaming / segnale debole su finestra mobile) e filtro "solo problematici"; API `/api/clients`.
-- **pagina Lease** (`/leases`) con la tabella DHCP/ARP (IP/MAC/host, riservato vs dinamico, scadenza, online, nodo), API `/api/leases`.
-- **pagina Sicurezza** (`/security`) con postura (firewall, gestione remota, DMZ, UPnP, WPS, password admin di default, ecc.) e porte esposte, API `/api/security`; drift di sicurezza registrati nel Log.
-- **pagina Log** (`/events`) con eventi DFS, nuovi dispositivi e nodi su/giù delle ultime 24h (persistiti su volume), API `/api/events`.
+- a lightweight **web GUI** (`/`) with nodes, backhaul (RSSI / channel / speed / DFS flag), clients and WAN status;
+- a **JSON API** (`/api/state`) — an integration point for other tools;
+- **Home Assistant export** via MQTT discovery (sensors appear automatically);
+- a **health check** (`/healthz`);
+- a **Clients page** (`/clients`), filterable and sortable, with a **Health** column (flapping / roaming / weak signal over a rolling window) and a "problems only" filter; `/api/clients`;
+- a **Leases page** (`/leases`) with the DHCP/ARP table (IP/MAC/host, reserved vs dynamic, expiry, online, node); `/api/leases`;
+- a **Security page** (`/security`) with posture (firewall, remote management, DMZ, UPnP, WPS, default admin password, …) and exposed ports; `/api/security`; security drift is recorded in the Log;
+- a **Log page** (`/events`) with DFS changes, new devices, node up/down and security drift (persisted to a volume); `/api/events`.
 
-Stato letto da un unico snapshot (`app/poller.py`), condiviso da GUI, API e MQTT.
+State is read into a single snapshot (`app/poller.py`), shared by the GUI, the API and MQTT.
 
-## Configurazione (env)
+## Configuration (env)
 
-| Variabile | Default | Note |
+| Variable | Default | Notes |
 |---|---|---|
-| `ROUTER_URL` | `http://192.168.1.1` | IP del router master |
-| `POLL_INTERVAL` | `30` | secondi tra un polling e l'altro |
-| `ROUTER_PASSWORD` / `ROUTER_PASSWORD_FILE` | — | password locale admin; il secret ha priorità |
-| `MQTT_HOST` | — | se assente, MQTT disabilitato |
+| `ROUTER_URL` | `http://192.168.1.1` | master router IP |
+| `POLL_INTERVAL` | `30` | seconds between polls |
+| `ROUTER_PASSWORD` / `ROUTER_PASSWORD_FILE` | — | local admin password; the secret takes precedence |
+| `MQTT_HOST` | — | if unset, MQTT is disabled |
 | `MQTT_PORT` | `1883` | |
-| `MQTT_USERNAME` / `MQTT_PASSWORD` | — | opzionali |
-| `ALLOW_WRITES` | `false` | abilita gli endpoint di scrittura (DHCP, reboot) |
+| `MQTT_USERNAME` / `MQTT_PASSWORD` | — | optional |
+| `ALLOW_WRITES` | `false` | enables the write endpoints (DHCP, reboot) |
 
-### Variabili di deployment (compose/Swarm)
+### Deployment variables (compose/Swarm)
 
-| Variabile | Default | Note |
+| Variable | Default | Notes |
 |---|---|---|
-| `IMAGE_TAG` | `latest` | tag immagine GHCR |
-| `GUI_PORT` | `8091` | porta pubblicata della GUI |
-| `OVERLAY_NETWORK` | `homelab` | nome della rete overlay esterna esistente |
-| `DEPLOY_NODE` | `rpi1` | hostname del nodo Swarm su cui fissare il servizio |
+| `IMAGE_TAG` | `latest` | GHCR image tag |
+| `GUI_PORT` | `8091` | published GUI port |
+| `OVERLAY_NETWORK` | `homelab` | name of the existing external overlay network |
+| `DEPLOY_NODE` | `rpi1` | Swarm node hostname to pin the service to |
 
-Tutte impostabili come env dello stack in Portainer: niente da editare nel file.
-Vedi `.env.example`.
+All of these can be set as stack env vars in Portainer — nothing to edit in the
+file. See `.env.example`.
 
-## Prova locale
+## Run locally
 
 ```bash
 pip install -r requirements.txt
-export ROUTER_PASSWORD='la-tua-password'
+export ROUTER_PASSWORD='your-password'
 export ROUTER_URL='http://192.168.1.1'
 uvicorn app.main:app --host 0.0.0.0 --port 8080
-# apri http://localhost:8080
+# open http://localhost:8080
 ```
 
-## Immagine (GHCR)
+## Image (GHCR)
 
-GitHub Actions (`.github/workflows/build.yml`) builda l'immagine multi-arch
-(arm64 + amd64) a ogni push su `main` e la pubblica su
+GitHub Actions (`.github/workflows/build.yml`) builds a multi-arch image
+(arm64 + amd64) on every push to `main` and publishes it to
 `ghcr.io/mmesenasco/linksysapiwrapper:latest`.
 
-## Deploy su Docker Swarm (Portainer, da git)
+## Deploy on Docker Swarm (Portainer, from git)
 
-1. **Secret**: Portainer → Secrets → Add secret, nome `router_password`, valore = password locale admin del router.
-2. **Rete**: imposta `OVERLAY_NETWORK` al nome della tua rete overlay esterna (default `homelab`).
-3. **Registry GHCR**: se il package è privato, Portainer → Registries → aggiungi `ghcr.io` con username GitHub e un PAT `read:packages`. In alternativa rendi pubblico il package.
-4. **Stack**: Portainer → Stacks → Add stack → *Repository*; URL del repo, reference `refs/heads/main`, compose path `stack.yml`. Deploy.
+1. **Secret**: Portainer → Secrets → Add secret, name `router_password`, value = the router's local admin password.
+2. **Network**: set `OVERLAY_NETWORK` to the name of your external overlay network (default `homelab`).
+3. **GHCR registry**: if the package is private, Portainer → Registries → add `ghcr.io` with your GitHub username and a `read:packages` PAT. Alternatively make the package public.
+4. **Stack**: Portainer → Stacks → Add stack → *Repository*; repo URL, reference `refs/heads/main`, compose path `stack.yml`. Deploy.
 
-GUI su `http://rpi1:8091`.
+GUI at `http://rpi1:8091`.
 
-### Deploy manuale (CLI)
+### Manual deploy (CLI)
 
 ```bash
-printf 'la-tua-password' | docker secret create router_password -
-docker stack deploy -c stack.yml velop   # richiede l'immagine su GHCR
+printf 'your-password' | docker secret create router_password -
+docker stack deploy -c stack.yml velop   # requires the image on GHCR
 ```
 
 ## Home Assistant
 
-Con `MQTT_HOST` impostato e l'integrazione MQTT attiva in HA, i dispositivi
-"Velop <stanza>" e "Velop mesh" appaiono da soli con sensori: online, velocità e
-RSSI di backhaul, canale, flag DFS, client totali.
+With `MQTT_HOST` set and the MQTT integration active in HA, the "Velop <room>"
+and "Velop mesh" devices appear automatically with sensors: online state,
+backhaul speed and RSSI, channel, DFS flag, total clients.
 
-## Note JNAP
+## JNAP notes
 
-- Azioni usate: `core/GetDeviceInfo`, `devicelist/GetDevices3`,
-  `nodes/diagnostics/GetBackhaulInfo`. `router/GetWANStatus` è best-effort.
-- DFS: un backhaul su canale 52–64 o 100–144 può cadere su rilevamento radar;
-  il flag `is_dfs` lo evidenzia.
-## Scritture (fase 2)
+- Actions used: `core/GetDeviceInfo`, `devicelist/GetDevices3`,
+  `nodes/diagnostics/GetBackhaulInfo`. `router/GetWANStatus` is best-effort.
+- Per-client radio metrics come from `networkconnections/GetNetworkConnections`,
+  queried on the master **and** on each node's own IP and merged by MAC, so
+  clients on the Velop nodes also get signal/band/rate.
+- DFS: a backhaul on channel 52–64 or 100–144 can drop on radar detection; the
+  `is_dfs` flag highlights it.
 
-Con `ALLOW_WRITES=true` si attivano gli endpoint di scrittura e la sezione di
-gestione nella GUI. Con il flag a `false` (default) il servizio è sola lettura e
-questi endpoint rispondono `403`.
+## Writes (phase 2)
 
-| Metodo | Endpoint | Azione |
+With `ALLOW_WRITES=true` the write endpoints and the management section of the
+GUI are enabled. With the flag `false` (default) the service is read-only and
+these endpoints return `403`.
+
+| Method | Endpoint | Action |
 |---|---|---|
-| `GET` | `/api/reservations` | elenca le prenotazioni DHCP (anche a writes off) |
-| `POST` | `/api/reservations` | aggiunge/aggiorna `{mac, ip, description}` |
-| `DELETE` | `/api/reservations/{mac}` | rimuove una prenotazione |
-| `POST` | `/api/nodes/{ip}/reboot` | riavvia un nodo per IP (master o figlio) |
+| `GET` | `/api/reservations` | list DHCP reservations (even with writes off) |
+| `POST` | `/api/reservations` | add/update `{mac, ip, description}` |
+| `DELETE` | `/api/reservations/{mac}` | remove a reservation |
+| `POST` | `/api/nodes/{ip}/reboot` | reboot a node by IP (master or child) |
 
-Le prenotazioni usano un **read-modify-write stretto**: si legge l'intero oggetto
-`GetLANSettings`, si modifica solo l'array `reservations`, e si rimanda indietro
-l'oggetto completo con `SetLANSettings`. Range DHCP, gateway e altre prenotazioni
-restano intatti. MAC e IP sono validati e un IP già prenotato per un altro MAC
-viene rifiutato prima di scrivere.
+Reservations use a **strict read-modify-write**: the whole `GetLANSettings`
+object is read, only the `reservations` array is changed, and the complete
+object is sent back with `SetLANSettings`. The DHCP range, gateway and other
+reservations stay intact. MAC and IP are validated, and an IP already reserved
+for a different MAC is rejected before writing.
 
-Il reboot di un nodo figlio sfrutta il fatto che ogni Velop parla JNAP sul proprio
-IP e accetta la stessa password admin del master.
+Rebooting a child node relies on the fact that each Velop speaks JNAP on its own
+IP and accepts the same admin password as the master.
 
-## Licenza
+## License
 
-[MIT](LICENSE) — libero di usare, modificare e ridistribuire, a patto di mantenere la nota di copyright. Contributi e issue benvenuti: se hai lo stesso router col firmware senza cloud, apri pure una PR.
+[MIT](LICENSE) — free to use, modify and redistribute, provided the copyright
+notice is kept. Contributions and issues welcome: if you have the same router on
+the cloud-less firmware, feel free to open a PR.
